@@ -12,7 +12,7 @@ description = "cleaning-app-backend"
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
+        languageVersion = JavaLanguageVersion.of(21)
     }
 }
 
@@ -21,15 +21,32 @@ repositories {
 }
 
 dependencies {
+    implementation("com.google.firebase:firebase-admin:9.2.0")
+
+
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-liquibase")
+
     implementation("org.springframework.boot:spring-boot-starter-security")
+    implementation("io.jsonwebtoken:jjwt-api:0.12.3")
+    implementation("io.jsonwebtoken:jjwt-impl:0.12.3") // было runtimeOnly
+    implementation("io.jsonwebtoken:jjwt-jackson:0.12.3") // было runtimeOnly
+
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("tools.jackson.module:jackson-module-kotlin")
     developmentOnly("org.springframework.boot:spring-boot-devtools")
+
+// dev
+    runtimeOnly("com.h2database:h2")
+    implementation("org.springframework.boot:spring-boot-h2console")
+// prod
     runtimeOnly("org.postgresql:postgresql")
+
+    implementation("org.springdoc:springdoc-openapi-ui:1.7.0") // API-контракт
+
+
     testImplementation("org.springframework.boot:spring-boot-starter-data-jpa-test")
     testImplementation("org.springframework.boot:spring-boot-starter-liquibase-test")
     testImplementation("org.springframework.boot:spring-boot-starter-security-test")

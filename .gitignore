@@ -25,6 +25,11 @@ bin/
 out/
 !**/src/main/**/out/
 !**/src/test/**/out/
+*.json
+adminsdk-service-account-key.json
+*.yaml
+application*.yaml
+
 
 ### NetBeans ###
 /nbproject/private/

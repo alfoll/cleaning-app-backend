@@ -1,0 +1,522 @@
+openapi: 3.1.0
+
+info:
+  title: CleaningApp API
+  description: API for users, households, tasks, privileges, transactions and activity management.
+  version: 1.0.0
+
+servers:
+  - url: 'http://localhost:8080'
+    description: Local development server
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        name:
+          type: string
+        avatar_url:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    UserRegisterRequest:
+      type: object
+      required:
+        - email
+        - password
+        - name
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+        name:
+          type: string
+
+    UserLoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+
+    HouseholdResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        invite_code:
+          type: string
+        max_members:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        is_active:
+          type: boolean
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserHousehold'
+
+    HouseholdCreateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+      required:
+        - name
+
+    HouseholdJoinRequest:
+      type: object
+      properties:
+        invite_code:
+          type: string
+      required:
+        - invite_code
+
+    UserHousehold:
+      type: object
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        household_id:
+          type: string
+          format: uuid
+        balance:
+          type: integer
+        joined_at:
+          type: string
+          format: date-time
+        is_active:
+          type: boolean
+        user:
+          $ref: '#/components/schemas/UserResponse'
+
+    TaskResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        household_id:
+          type: string
+          format: uuid
+        created_by:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        reward:
+          type: integer
+        assigned_to:
+          type: string
+          format: uuid
+          nullable: true
+        assigned_at:
+          type: string
+          format: date-time
+          nullable: true
+        is_completed:
+          type: boolean
+        completed_by:
+          type: string
+          format: uuid
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    TaskCreateRequest:
+      type: object
+      required:
+        - title
+        - reward
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        reward:
+          type: integer
+          minimum: 5
+          maximum: 100
+
+    PrivilegeResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        household_id:
+          type: string
+          format: uuid
+        created_by:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        title:
+          type: string
+        cost:
+          type: integer
+        is_active:
+          type: boolean
+
+    PrivilegeCreateRequest:
+      type: object
+      required:
+        - title
+        - cost
+      properties:
+        title:
+          type: string
+        cost:
+          type: integer
+
+    TransactionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        household_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        amount:
+          type: integer
+        type:
+          type: string
+          enum: [TASK_COMPLETION, PRIVILEGE_BOUGHT]
+        related_entity_id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+
+    ActivityResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        household_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+          nullable: true
+        activity_type:
+          type: string
+          enum: [TASK_CREATED, TASK_ASSIGNED, TASK_COMPLETED, PRIVILEGE_CREATED, PRIVILEGE_BOUGHT, USER_JOINED, USER_LEFT, HOUSEHOLD_CREATED]
+        title:
+          type: string
+        related_entity_id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+
+security:
+  - BearerAuth: []
+
+paths:
+  # -----------------------------
+  # Auth
+  # -----------------------------
+  /auth/register:
+    post:
+      summary: Регистрация пользователя
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRegisterRequest'
+      responses:
+        '201':
+          description: Успешная регистрация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+
+  /auth/login:
+    post:
+      summary: Вход пользователя
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserLoginRequest'
+      responses:
+        '200':
+          description: Успешный вход
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+
+  /auth/logout:
+    post:
+      summary: Выход пользователя из системы
+      security:
+        - BearerAuth: [ ]
+      responses:
+        '204':
+          description: Успешный выход
+
+
+  # -----------------------------
+  # User profile
+  # -----------------------------
+  /users/me:
+    get:
+      summary: Получение информации о текущем пользователе
+      security:
+        - BearerAuth: [ ]
+      responses:
+        '200':
+          description: Информация о пользователе
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+    put:
+      summary: Редактирование профиля пользователя
+      security:
+        - BearerAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                avatar_url:
+                  type: string
+      responses:
+        '200':
+          description: Обновленный профиль пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+
+  # -----------------------------
+  # Households
+  # -----------------------------
+  /households:
+    post:
+      summary: Создать новое домохозяйство
+      security:
+        - BearerAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+      responses:
+        '201':
+          description: Домохозяйство создано
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HouseholdResponse'
+    get:
+      summary: Получить список домохозяйств пользователя
+      security:
+        - BearerAuth: [ ]
+      responses:
+        '200':
+          description: Список домохозяйств
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HouseholdResponse'
+
+  /households/join:
+    post:
+      summary: Присоединение к домохозяйству по коду
+      security:
+        - BearerAuth: [ ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - invite_code
+              properties:
+                invite_code:
+                  type: string
+      responses:
+        '200':
+          description: Пользователь присоединился
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HouseholdResponse'
+
+  /households/{household_id}:
+    get:
+      summary: Получить информацию о домохозяйстве
+      security:
+        - BearerAuth: [ ]
+      parameters:
+        - in: path
+          name: household_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Детальная информация о домохозяйстве
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HouseholdResponse'
+    delete:
+      summary: Удалить домохозяйство
+      security:
+        - BearerAuth: [ ]
+      parameters:
+        - in: path
+          name: household_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Домохозяйство удалено
+    patch: #/ надо оно ваще или нет этот патч
+      summary: Редактирование хозяйства (имя)
+      security:
+        - BearerAuth: [ ]
+      parameters:
+        - in: path
+          name: household_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: Новое имя хозяйства
+      responses:
+        '200':
+          description: Обновленное хозяйство
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HouseholdResponse'
+
+  /households/{household_id}/leave:
+    delete:
+      summary: Покинуть домохозяйство
+      security:
+        - BearerAuth: [ ]
+      parameters:
+        - in: path
+          name: household_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Пользователь покинул домохозяйство
+
+  /households/{household_id}/members/{user_id}:
+    delete:
+      summary: Удалить участника из хозяйства
+      description: "Любой участник может удалить другого участника (например, если тот удалил приложение)."
+      security:
+        - BearerAuth: [ ]
+      parameters:
+        - in: path
+          name: household_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Участник удален из хозяйства
+# -----------------------------
+# Tasks, Privileges, Transactions, Activity, Leaderboard
+# (аналогично прописать CRUD эндпоинты для всех сущностей)
+# -----------------------------
+
+# Для сокращения здесь, могу сразу сделать полную версию с Task, Privilege, Transaction, Activity, Leaderboard
