@@ -1,5 +1,8 @@
 package com.cleaningapp.backend.user
 
+import com.cleaningapp.backend.exception.EmailAlreadyUserException
+import com.cleaningapp.backend.exception.UserAlreadyExistsException
+import com.cleaningapp.backend.exception.UserNotFoundException
 import org.springframework.data.repository.findByIdOrNull
 import java.util.UUID
 
@@ -10,11 +13,11 @@ class UserServiceImpl(
     override fun createUser(firebaseUid: String, user: UserRegisterDTO): UserResponseDTO {
 
         if (userRepository.findUserByFirebaseUid(firebaseUid) != null) {
-            throw RuntimeException("Account already exists")
+            throw UserAlreadyExistsException("Account already exists")
         }
 
         if (userRepository.findUserByEmail(user.email) != null) {
-            throw RuntimeException("User with this email already exists")
+            throw EmailAlreadyUserException("This email is already in use")
         }
 
         val userEntity = user.toUserEntity(firebaseUid)
@@ -23,7 +26,7 @@ class UserServiceImpl(
     // ОПАСНО, подумать
     override fun deleteUser(firebaseUid: String) {
         val user = userRepository.findUserByFirebaseUid(firebaseUid)
-            ?: throw RuntimeException("User does not exist")
+            ?: throw UserNotFoundException("User does not exist")
 
         return userRepository.deleteById(user.id)
     }
@@ -37,14 +40,15 @@ class UserServiceImpl(
                 val userWithEmail = userRepository.findUserByEmail(userNew.email)
                 // если такая почта уже существует - ее нельзя поставить
                 if (userWithEmail != null && userWithEmail.id != existingUser.id) {
-                    throw RuntimeException("This email already exists")
+                    throw EmailAlreadyUserException("This email is already in use")
                 }
             }
             // меняем остальное
             existingUser.name = userNew.name
             existingUser.email = userNew.email
             existingUser.avatarUrl = userNew.avatarUrl
-        } else throw RuntimeException("User does not exist")
+        } else
+            throw UserNotFoundException("User does not exist")
 
         return userRepository.save(existingUser).toDTO()
     }
@@ -56,13 +60,13 @@ class UserServiceImpl(
 
     override fun findUserById(id: UUID): UserResponseDTO =
         userRepository.findByIdOrNull(id)?.toDTO()
-            ?: throw RuntimeException("User not found")
+            ?: throw UserNotFoundException("User not found")
 
     override fun findUserByEmail(email: String): UserResponseDTO =
         userRepository.findUserByEmail(email)?.toDTO()
-            ?: throw RuntimeException("User not found")
+            ?: throw UserNotFoundException("User with this email not found")
 
     override fun findUserByFirebaseUid(firebaseUid: String): UserResponseDTO =
         userRepository.findUserByFirebaseUid(firebaseUid)?.toDTO()
-            ?: throw RuntimeException("User not found")
+            ?: throw UserNotFoundException("User with this uid not found")
 }
