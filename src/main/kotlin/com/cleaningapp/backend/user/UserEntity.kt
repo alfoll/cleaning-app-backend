@@ -30,5 +30,4 @@ class UserEntity(
 
     @Column(name = "createdAt", nullable = false)
     var createdAt: LocalDateTime = LocalDateTime.now(),
-) {
-}
+)

@@ -4,7 +4,7 @@ import java.time.LocalDateTime
 import java.util.UUID
 
 data class UserResponseDTO(
-    val id: UUID? = null,
+    val id: UUID, // почему то ьыло nullable
     val firebaseUid: String,
     val name: String,
     val email: String,
