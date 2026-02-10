@@ -4,8 +4,10 @@ import com.cleaningapp.backend.exception.EmailAlreadyUserException
 import com.cleaningapp.backend.exception.UserAlreadyExistsException
 import com.cleaningapp.backend.exception.UserNotFoundException
 import org.springframework.data.repository.findByIdOrNull
+import org.springframework.stereotype.Service
 import java.util.UUID
 
+@Service
 class UserServiceImpl(
     private val userRepository: UserRepository
 ) : UserService {

@@ -21,7 +21,7 @@ class SecurityConfiguration(
             .authorizeHttpRequests {
                 it
                     .requestMatchers("/api/ping").permitAll()
-                    .requestMatchers("/api/auth/register", "/api/auth/login").permitAll()
+                    .requestMatchers("/api/auth/register").permitAll()
                     .anyRequest().authenticated()
             }
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }

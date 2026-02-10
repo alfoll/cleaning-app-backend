@@ -22,7 +22,7 @@ fun UserRegisterDTO.toUserEntity(firebaseUid: String) = UserEntity(
 
 fun UserEntity.toUserDetails(): UserDetails =
     SpringUser.builder()
-        .username(email)
-        .password("") // ? null мб
+        .username(firebaseUid) // было email
+        .password(null)
         .roles("USER")
         .build()

@@ -349,6 +349,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UserResponse'
+    delete:
+      summary: Удаление (деактивация) аккаунта текущего пользователя
+      description: >
+        Деактивирует аккаунт пользователя.
+        Пользователь теряет доступ к системе, данные сохраняются.
+      security:
+        - BearerAuth: [ ]
+      responses:
+        '204':
+          description: Аккаунт успешно деактивирован
+        '401':
+          description: Пользователь не авторизован
+        '404':
+          description: Пользователь не найден
 
   # -----------------------------
   # Households

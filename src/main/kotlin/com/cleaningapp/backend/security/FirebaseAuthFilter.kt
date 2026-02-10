@@ -23,10 +23,18 @@ class FirebaseAuthFilter (
         response: HttpServletResponse,
         filterChain: FilterChain
     ) {
+        if (request.requestURI.startsWith("/api/ping")) {
+            filterChain.doFilter(request, response)
+            return
+        }
+
         val authHeader: String? = request.getHeader("Authorization")
 
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            filterChain.doFilter(request, response)
+            SecurityContextHolder.clearContext()
+            response.status = HttpServletResponse.SC_UNAUTHORIZED
+            response.contentType = "application/json"
+            response.writer.write("""{"error": "Firebase token required"}""")
             return
         }
 
