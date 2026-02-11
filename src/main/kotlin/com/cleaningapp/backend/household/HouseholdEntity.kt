@@ -6,6 +6,7 @@ import jakarta.persistence.GeneratedValue
 import jakarta.persistence.Id
 import jakarta.persistence.PrePersist
 import jakarta.persistence.Table
+import org.hibernate.annotations.CreationTimestamp
 import java.time.LocalDateTime
 import java.util.UUID
 
@@ -27,6 +28,7 @@ class HouseholdEntity(
 //    val maxMembers: Int = 6, // нахуй тут столбец где все 6? убрать в сервис
 
     @Column(name = "created_at", nullable = false)
+    @CreationTimestamp
     val createdAt: LocalDateTime = LocalDateTime.now(),
 
     @Column(name = "created_by_user", nullable = false, updatable = false) // нужно ли?

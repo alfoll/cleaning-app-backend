@@ -9,7 +9,7 @@ fun HouseholdEntity.toDto() = HouseholdResponseDTO(
     isActive = isActive,
 )
 
-fun HouseholdRegisterDTO.toEntity() = HouseholdEntity(
+fun HouseholdRegisterDTO.toHouseholdEntity() = HouseholdEntity(
     name = name,
     createdByUser = createdByUser,
 )
