@@ -21,7 +21,9 @@ class SecurityConfiguration(
             .authorizeHttpRequests {
                 it
                     .requestMatchers("/api/ping").permitAll()
-                    .requestMatchers("/api/auth/register").permitAll()
+                    // для аутентфициованных пользователей,
+                    // так как регистрация в бд происходит только с валидным fb токеном
+                    .requestMatchers("/api/auth/register").authenticated()
                     .anyRequest().authenticated()
             }
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }

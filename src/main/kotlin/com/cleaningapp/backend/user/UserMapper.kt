@@ -5,7 +5,7 @@ import org.springframework.security.core.userdetails.UserDetails
 typealias SpringUser = org.springframework.security.core.userdetails.User
 
 fun UserEntity.toDTO() = UserResponseDTO(
-    id = id,
+    id = id!!, // когда используется маппер id уже гарантированно не null (null только до сохранения в бд)
     firebaseUid = firebaseUid,
     name = name,
     email = email,
@@ -22,7 +22,7 @@ fun UserRegisterDTO.toUserEntity(firebaseUid: String) = UserEntity(
 
 fun UserEntity.toUserDetails(): UserDetails =
     SpringUser.builder()
-        .username(firebaseUid) // было email
+        .username(firebaseUid)
         .password(null)
         .roles("USER")
         .build()

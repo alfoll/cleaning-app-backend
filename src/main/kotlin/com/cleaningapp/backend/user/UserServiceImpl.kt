@@ -14,23 +14,32 @@ class UserServiceImpl(
 
     override fun createUser(firebaseUid: String, user: UserRegisterDTO): UserResponseDTO {
 
+        // проверка что такого аккаунта не существует
         if (userRepository.findUserByFirebaseUid(firebaseUid) != null) {
             throw UserAlreadyExistsException("Account already exists")
         }
 
+        // проверка что почта не занята
         if (userRepository.findUserByEmail(user.email) != null) {
             throw EmailAlreadyUserException("This email is already in use")
         }
 
+        // сохранение юзера в бд
         val userEntity = user.toUserEntity(firebaseUid)
         return userRepository.save(userEntity).toDTO()
     }
+
     // ОПАСНО, подумать
     override fun deleteUser(firebaseUid: String) {
+        // проверка что юзер существует
         val user = userRepository.findUserByFirebaseUid(firebaseUid)
             ?: throw UserNotFoundException("User does not exist")
 
-        return userRepository.deleteById(user.id)
+        // провера id на null на всякий случай
+        val userId = user.id
+            ?: throw IllegalStateException("User ID is null. Entity is not persisted.")
+
+        return userRepository.deleteById(userId)
     }
 
     override fun updateProfile(firebaseUid: String, userNew: UserRegisterDTO): UserResponseDTO {

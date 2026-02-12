@@ -33,6 +33,7 @@ class GlobalExceptionHandler {
     @ExceptionHandler(Exception::class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR) // 500
     fun handleException(e: Exception): ExcResponse {
-        return ExcResponse("500 INTERNAL_SERVER_ERROR")
+        e.printStackTrace() // стектрейс
+        return ExcResponse("500 INTERNAL_SERVER_ERROR", e.message)
     }
 }
