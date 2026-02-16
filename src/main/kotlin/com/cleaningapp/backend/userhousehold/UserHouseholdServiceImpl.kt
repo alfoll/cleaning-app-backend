@@ -7,8 +7,10 @@ import com.cleaningapp.backend.user.UserResponseDTO
 import com.cleaningapp.backend.user.toDTO
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.security.core.context.SecurityContextHolder
+import org.springframework.stereotype.Service
 import java.util.UUID
 
+@Service
 class UserHouseholdServiceImpl(
     private val userHouseholdRepository: UserHouseholdRepository,
     private val householdRepository: HouseholdRepository,
