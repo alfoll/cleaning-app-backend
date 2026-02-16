@@ -22,12 +22,12 @@ class UserHouseholdEntity(
     @Id
     @GeneratedValue
     @Column(name = "id", columnDefinition = "uuid", nullable = false, updatable = false)
-    val id: UUID = UUID.randomUUID(),
+    val id: UUID? = null, // JPA сам генерит id при сохранении в бд
 
     @Column(name = "balance", nullable = false)
     var balance: Int = 0,
 
-    @Column(name = "joined_at", nullable = false)
+    @Column(name = "joined_at", nullable = false, updatable = false)
     @CreationTimestamp
     val joinedAt: LocalDateTime = LocalDateTime.now(),
 
@@ -35,11 +35,11 @@ class UserHouseholdEntity(
     var isUserActive: Boolean = true,
 ) {
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "userId", nullable = false)
+    @JoinColumn(name = "user_id", nullable = false)
     lateinit var user: UserEntity
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "householdId", nullable = false)
+    @JoinColumn(name = "household_id", nullable = false)
     lateinit var household: HouseholdEntity
 }
 

@@ -1,7 +1,7 @@
 package com.cleaningapp.backend.household
 
 fun HouseholdEntity.toDto() = HouseholdResponseDTO(
-    id = id,
+    id = id!!, // когда используется маппер id уже гарантированно не null (null только до сохранения в бд)
     name = name,
     inviteCode = inviteCode,
     createdAt = createdAt,

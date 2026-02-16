@@ -18,6 +18,8 @@ class UserController(
     private val userService: UserService
 ) {
     @GetMapping("/me")
+    // firebase uid достается из контекста из UserDetails (username)
+    // (idToken от fb проверяется на валидность в фильтре на каждый эндпойнт -> uid в UserDetails как username)
     fun getProfile(@AuthenticationPrincipal userDetails: UserDetails): UserResponseDTO =
         userService.findUserByFirebaseUid(userDetails.username)
 

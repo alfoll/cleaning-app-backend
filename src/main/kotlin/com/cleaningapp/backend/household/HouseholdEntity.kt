@@ -16,10 +16,10 @@ class HouseholdEntity(
     @Id
     @GeneratedValue
     @Column(name = "id", columnDefinition = "uuid", nullable = false, updatable = false)
-    val id: UUID = UUID.randomUUID(),
+    val id: UUID? = null, // JPA сам генерит id при сохранении в бд
 
     @Column(name = "name", nullable = false)
-    val name: String,
+    var name: String,
 
     @Column(name = "invite_code", nullable = false, unique = true, updatable = false)
     var inviteCode: String = "",
@@ -27,7 +27,7 @@ class HouseholdEntity(
 //    @Column(name = "max_members", nullable = false)
 //    val maxMembers: Int = 6, // нахуй тут столбец где все 6? убрать в сервис
 
-    @Column(name = "created_at", nullable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     @CreationTimestamp
     val createdAt: LocalDateTime = LocalDateTime.now(),
 

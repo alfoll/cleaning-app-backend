@@ -5,8 +5,8 @@ import com.cleaningapp.backend.user.UserEntity
 
 fun UserHouseholdEntity.toDto() : UserHouseholdResponseDTO =
     UserHouseholdResponseDTO(
-        id = id,
-        householdId = household.id,
+        id = id!!, // когда используется маппер id уже гарантированно не null (null только до сохранения в бд)
+        householdId = household.id!!,
         balance = balance,
         joinedAt = joinedAt,
         isUserActive = isUserActive,
