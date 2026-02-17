@@ -6,11 +6,13 @@ import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.FetchType
 import jakarta.persistence.GeneratedValue
+import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
+import jakarta.persistence.Version
 import org.hibernate.annotations.CreationTimestamp
 import java.time.LocalDateTime
 import java.util.UUID
@@ -20,7 +22,7 @@ import java.util.UUID
     uniqueConstraints = [UniqueConstraint(columnNames = ["user_id", "household_id"])])
 class UserHouseholdEntity(
     @Id
-    @GeneratedValue
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", columnDefinition = "uuid", nullable = false, updatable = false)
     val id: UUID? = null, // JPA сам генерит id при сохранении в бд
 
@@ -33,6 +35,10 @@ class UserHouseholdEntity(
 
     @Column(name = "is_user_active", nullable = false)
     var isUserActive: Boolean = true,
+
+//    @Version
+//    @Column
+//    var version: Long = 0L,
 ) {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)

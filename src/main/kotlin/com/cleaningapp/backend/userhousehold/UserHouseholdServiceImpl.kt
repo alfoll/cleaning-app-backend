@@ -8,9 +8,11 @@ import com.cleaningapp.backend.user.toDTO
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
 @Service
+@Transactional
 class UserHouseholdServiceImpl(
     private val userHouseholdRepository: UserHouseholdRepository,
     private val householdRepository: HouseholdRepository,
@@ -82,8 +84,11 @@ class UserHouseholdServiceImpl(
         // сделать неактивным в хозяйстве (мягкое удаление?) или удалить запись
         userHousehold.isUserActive = false
         userHouseholdRepository.save(userHousehold) // подумать над удалением
+
+        // если это был последний участник хозяйства - вызвать удаление хозяйства
     }
 
+    @Transactional(readOnly = true)
     override fun getUserHouseholds(): List<UserHouseholdResponseDTO> {
         // достать юзера
         val user = getCurrentUser()
@@ -95,6 +100,7 @@ class UserHouseholdServiceImpl(
             .map { it.toDto() }
     }
 
+    @Transactional(readOnly = true)
     override fun getHouseholdMembers(householdId: UUID): List<UserResponseDTO> {
         // существует ли такое хозяйство
         val household = householdRepository.findByIdOrNull(householdId)

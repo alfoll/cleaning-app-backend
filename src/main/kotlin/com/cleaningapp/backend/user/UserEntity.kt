@@ -27,10 +27,10 @@ class UserEntity(
     @Column(name = "name", nullable = false)
     var name: String,
 
-    @Column(name = "avatarUrl")
+    @Column(name = "avatar_url")
     var avatarUrl: String? = null,
 
-    @Column(name = "createdAt", nullable = false)
+    @Column(name = "created_at", nullable = false)
     @CreationTimestamp
     var createdAt: LocalDateTime = LocalDateTime.now(),
 )

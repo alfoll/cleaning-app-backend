@@ -12,7 +12,7 @@ interface UserHouseholdService {
     fun getUserHouseholds(): List<UserHouseholdResponseDTO>
     fun getHouseholdMembers(householdId: UUID): List<UserResponseDTO>
 
-    // вызывается из TaskService
+    // вызывается из TaskService/TransactionService (не публичный API)
     fun increaseBalance(householdId: UUID, amount: Int): UserHouseholdResponseDTO
     fun decreaseBalance(householdId: UUID, amount: Int): UserHouseholdResponseDTO
 
