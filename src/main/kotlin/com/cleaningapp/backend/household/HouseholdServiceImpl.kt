@@ -38,7 +38,7 @@ class HouseholdServiceImpl(
         throw IllegalStateException("Failed to generate unique invite code")
     }
 
-    // доостать юзера из контекста - нужно ли?
+    // доостать юзера из контекста
     private fun getCurrentUser(): UserEntity {
         val auth = SecurityContextHolder.getContext().authentication
             ?: throw RuntimeException("User not authenticated")
@@ -125,17 +125,29 @@ class HouseholdServiceImpl(
     }
 
     override fun findHouseholdByInviteCode(inviteCode: String): HouseholdResponseDTO {
-        return householdRepository.findByInviteCode(inviteCode)?.toDto()
+        val household = householdRepository.findByInviteCode(inviteCode)
             ?: throw RuntimeException("Household not found")
+
         // проверить активно ли хозяйство
-        // проверить состояит ли пользователь в хозяйстве - зачем?
+        if (!household.isActive)
+            throw RuntimeException("Household is not active")
+
+        // проверить состояит ли пользователь в хозяйстве
+        // - не нужно так как пользователь ищет хозяйство по инвайт коду при втуплении в него
+
+        return household.toDto()
     }
 
     override fun findHouseholdById(id: UUID): HouseholdResponseDTO {
-        return householdRepository.findByIdOrNull(id)?.toDto()
+        val household = householdRepository.findByIdOrNull(id)
             ?: throw RuntimeException("Household not found")
-        // проверить активно ли хозяйство
+
+        // проверить активно ли хозяйство - нужно ли?
+        if (!household.isActive)
+            throw RuntimeException("Household is not active")
+
         // проверить состояит ли пользователь в хозяйстве - зачем?
+        return household.toDto()
     }
 
 }

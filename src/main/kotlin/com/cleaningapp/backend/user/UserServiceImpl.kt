@@ -39,6 +39,7 @@ class UserServiceImpl(
         val userId = user.id
             ?: throw IllegalStateException("User ID is null. Entity is not persisted.")
 
+        // как то реализовать удаление с очищением связей - мягкое?
         return userRepository.deleteById(userId)
     }
 
@@ -62,11 +63,6 @@ class UserServiceImpl(
             throw UserNotFoundException("User does not exist")
 
         return userRepository.save(existingUser).toDTO()
-    }
-
-    // в AuthService
-    override fun changePassword(firebaseUid: String, newPassword: String): UserResponseDTO {
-        TODO("Not yet implemented") // делается чезе firebase
     }
 
     override fun findUserById(id: UUID): UserResponseDTO =

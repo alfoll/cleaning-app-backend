@@ -8,9 +8,6 @@ interface UserService {
 
     fun updateProfile(firebaseUid: String, userNew: UserRegisterDTO): UserResponseDTO
 
-    // в AuthService
-    fun changePassword(firebaseUid: String, newPassword: String): UserResponseDTO
-
     fun findUserById(id: UUID): UserResponseDTO
     fun findUserByEmail(email: String): UserResponseDTO
     fun findUserByFirebaseUid(firebaseUid: String): UserResponseDTO

@@ -32,4 +32,6 @@ class UserController(
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun deleteProfile(@AuthenticationPrincipal userDetails: UserDetails) =
         userService.deleteUser(userDetails.username)
+
+    // хозяйства пользователя можно взять через UserHouseholdController
 }

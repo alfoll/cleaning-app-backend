@@ -70,10 +70,15 @@ class UserHouseholdServiceImpl(
         // достать юзера
         val user = getCurrentUser()
 
-        // найти хозяйство (проверить есть ли такое) ИЛИ/И найти связь (проверить есть ли она)
+        // найти хозяйство (проверить есть ли такое)
         val household = householdRepository.findByIdOrNull(householdId)
             ?: throw RuntimeException("Household not found")
 
+        // активно ли хозяйство
+        if (!household.isActive)
+            throw RuntimeException("Household is not active")
+
+        // найти связь (проверить есть ли она)
         val userHousehold = userHouseholdRepository.findByUserIdAndHouseholdId(user.id!!, household.id!!)
             ?: throw RuntimeException("User is not in this household")
 
@@ -86,6 +91,46 @@ class UserHouseholdServiceImpl(
         userHouseholdRepository.save(userHousehold) // подумать над удалением
 
         // если это был последний участник хозяйства - вызвать удаление хозяйства
+    }
+
+    override fun removeUserFromHousehold(householdId: UUID, userToRemoveId: UUID) {
+        // достать юзера КОТОРЫЙ УДАЛЯЕТ
+        val user = getCurrentUser()
+
+        // найти хозяйство
+        val household = householdRepository.findByIdOrNull(householdId)
+            ?: throw RuntimeException("Household not found")
+
+        // проверить активно ли хозяйство
+        if (!household.isActive)
+            throw RuntimeException("Household is not active")
+
+        // проверить что удаляющий есть в хозяйстве
+        val userHousehold = userHouseholdRepository.findByUserIdAndHouseholdId(user.id!!, household.id!!)
+            ?: throw RuntimeException("User is not in this household")
+
+        // проверить что удаляющий активен в хозяйстве
+        if (!userHousehold.isUserActive)
+            throw RuntimeException("User is not active in this household")
+
+        // проверить что юзер имеет право удалять (создатель)
+        if (household.createdByUser.id != user.id)
+            throw RuntimeException("User cannot remove anybody from household (he is not creator)")
+
+        // запретить удаление самого себя (для этого leaveHousehold)
+        if (user.id == userToRemoveId)
+            throw RuntimeException("You cannot remove yourself, use leaveHousehold method to leave household")
+
+        // проверить что УДАЛЯЕМЫЙ ЮЗЕР состоит в хозяйстве
+        val removedUser = userHouseholdRepository.findByUserIdAndHouseholdId(userToRemoveId, household.id!!)
+            ?: throw RuntimeException("User to remove is not member of this household")
+
+        // проверить что УДАЛЯЕМЫЙ ЮЗЕР активен в хозяйстве
+        if (!removedUser.isUserActive)
+            throw RuntimeException("User to remove is already not active in this household")
+
+        // удалить другого юзера
+        userHouseholdRepository.delete(removedUser)
     }
 
     @Transactional(readOnly = true)
