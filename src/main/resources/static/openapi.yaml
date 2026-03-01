@@ -6,7 +6,7 @@ info:
   version: 1.0.0
 
 servers:
-  - url: 'http://localhost:8080'
+  - url: 'http://localhost:8080/api'
     description: Local development server
 
 components:
@@ -23,47 +23,47 @@ components:
         id:
           type: string
           format: uuid
-        email:
+        firebaseUid:
           type: string
         name:
           type: string
-        avatar_url:
+        email:
           type: string
-          nullable: true
-        created_at:
+        createdAt:
           type: string
           format: date-time
+        avatarUrl:
+          type: string
+          nullable: true
 
     UserRegisterRequest:
       type: object
       required:
-        - email
-        - password
         - name
+        - email
       properties:
-        email:
-          type: string
-        password:
-          type: string
         name:
           type: string
-
-    UserLoginRequest:
-      type: object
-      required:
-        - email
-        - password
-      properties:
+          minLength: 2
+          maxLength: 30
         email:
           type: string
-        password:
+          format: email
+        avatarUrl:
           type: string
+          nullable: true
 
-    AuthResponse:
+    ExcResponse:
       type: object
       properties:
-        token:
+        error:
           type: string
+        message:
+          type: string
+          nullable: true
+        time:
+          type: string
+          format: date-time
 
     HouseholdResponse:
       type: object
@@ -73,54 +73,49 @@ components:
           format: uuid
         name:
           type: string
-        invite_code:
+        inviteCode:
           type: string
-        max_members:
-          type: integer
-        created_at:
+        createdAt:
           type: string
           format: date-time
-        is_active:
+        createdByUser:
+          type: string
+          format: uuid
+        isActive:
           type: boolean
-        members:
-          type: array
-          items:
-            $ref: '#/components/schemas/UserHousehold'
 
-    HouseholdCreateRequest:
+    HouseholdRegisterRequest:
       type: object
+      required:
+        - name
       properties:
         name:
           type: string
-      required:
-        - name
 
-    HouseholdJoinRequest:
+    UserHouseholdJoinRequest:
       type: object
       properties:
-        invite_code:
+        inviteCode:
           type: string
       required:
-        - invite_code
+        - inviteCode
 
-    UserHousehold:
+    UserHouseholdResponse:
       type: object
       properties:
-        user_id:
+        id:
           type: string
           format: uuid
-        household_id:
+        householdId:
           type: string
           format: uuid
         balance:
           type: integer
-        joined_at:
+        joinedAt:
           type: string
           format: date-time
-        is_active:
+        isUserActive:
           type: boolean
-        user:
-          $ref: '#/components/schemas/UserResponse'
 
     TaskResponse:
       type: object
@@ -271,6 +266,8 @@ paths:
   /auth/register:
     post:
       summary: Регистрация пользователя
+      security:
+        - BearerAuth: []
       requestBody:
         required: true
         content:
@@ -283,43 +280,22 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthResponse'
-
-  /auth/login:
-    post:
-      summary: Вход пользователя
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UserLoginRequest'
-      responses:
-        '200':
-          description: Успешный вход
+                $ref: '#/components/schemas/UserResponse'
+        '409':
+          description: USER_ALREADY_EXISTS или EMAIL_ALREADY_USED
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthResponse'
-
-  /auth/logout:
-    post:
-      summary: Выход пользователя из системы
-      security:
-        - BearerAuth: [ ]
-      responses:
-        '204':
-          description: Успешный выход
-
+                $ref: '#/components/schemas/ExcResponse'
 
   # -----------------------------
   # User profile
   # -----------------------------
   /users/me:
     get:
-      summary: Получение информации о текущем пользователе
+      summary: Получение профиля пользователя
       security:
-        - BearerAuth: [ ]
+        - BearerAuth: []
       responses:
         '200':
           description: Информация о пользователе
@@ -327,21 +303,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UserResponse'
+        '404':
+          description: USER_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
     put:
       summary: Редактирование профиля пользователя
       security:
-        - BearerAuth: [ ]
+        - BearerAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                avatar_url:
-                  type: string
+              $ref: '#/components/schemas/UserRegisterRequest'
       responses:
         '200':
           description: Обновленный профиль пользователя
@@ -349,27 +326,48 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UserResponse'
+        '404':
+          description: USER_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+        '409':
+          description: EMAIL_ALREADY_USED
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+
     delete:
       summary: Удаление (деактивация) аккаунта текущего пользователя
       description: >
         Деактивирует аккаунт пользователя.
         Пользователь теряет доступ к системе, данные сохраняются.
       security:
-        - BearerAuth: [ ]
+        - BearerAuth: []
       responses:
         '204':
-          description: Аккаунт успешно деактивирован
-        '401':
-          description: Пользователь не авторизован
+          description: Успешно
+        '403':
+          description: USER_NOT_ACTIVE или ACCESS_DENIED
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
         '404':
-          description: Пользователь не найден
+          description: USER_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
 
   # -----------------------------
   # Households
   # -----------------------------
   /households:
     post:
-      summary: Создать новое домохозяйство
+      summary: Создать домохозяйство
       security:
         - BearerAuth: [ ]
       requestBody:
@@ -377,12 +375,8 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - name
-              properties:
-                name:
-                  type: string
+              $ref: '#/components/schemas/HouseholdRegisterRequest'
+
       responses:
         '201':
           description: Домохозяйство создано
@@ -390,6 +384,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HouseholdResponse'
+        '409':
+          description: BUSINESS_CONFLICT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+        '403':
+          description: ACCESS_DENIED
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+
     get:
       summary: Получить список домохозяйств пользователя
       security:
@@ -414,60 +421,103 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - invite_code
-              properties:
-                invite_code:
-                  type: string
+              $ref: '#/components/schemas/UserHouseholdJoinRequest'
       responses:
         '200':
-          description: Пользователь присоединился
+          description: Пользователь присоединился к хозяйству
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HouseholdResponse'
+                $ref: '#/components/schemas/UserHouseholdResponse'
+        '404':
+          description: HOUSEHOLD_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+        '403':
+          description: HOUSEHOLD_NOT_ACTIVE или MEMBERSHIP_NOT_ACTIVE
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+        '409':
+          description: BUSINESS_CONFLICT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
 
-  /households/{household_id}:
+  /households/{householdId}:
     get:
       summary: Получить информацию о домохозяйстве
       security:
         - BearerAuth: [ ]
       parameters:
-        - in: path
-          name: household_id
+        - name: householdId
+          in: path
           required: true
           schema:
             type: string
             format: uuid
       responses:
         '200':
-          description: Детальная информация о домохозяйстве
+          description: Информация о домохозяйстве
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/HouseholdResponse'
+        '404':
+          description: HOUSEHOLD_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+        '403':
+          description: HOUSEHOLD_NOT_ACTIVE или MEMBERSHIP_NOT_ACTIVE
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+        '409':
+          description: BUSINESS_CONFLICT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
     delete:
       summary: Удалить домохозяйство
       security:
         - BearerAuth: [ ]
       parameters:
-        - in: path
-          name: household_id
+        - name: householdId
+          in: path
           required: true
           schema:
             type: string
             format: uuid
       responses:
         '204':
-          description: Домохозяйство удалено
-    patch: #/ надо оно ваще или нет этот патч
+          description: Домохозяйство успешно удалено
+        '404':
+          description: HOUSEHOLD_NOT_FOUND или MEMBERSHIP_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+        '403':
+          description: HOUSEHOLD_NOT_ACTIVE или MEMBERSHIP_NOT_ACTIVE
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+    put: #/ надо оно ваще или нет этот патч
       summary: Редактирование хозяйства (имя)
       security:
         - BearerAuth: [ ]
       parameters:
-        - in: path
-          name: household_id
+        - name: householdId
+          in: path
           required: true
           schema:
             type: string
@@ -477,57 +527,129 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                  description: Новое имя хозяйства
+              $ref: '#/components/schemas/HouseholdRegisterRequest'
       responses:
         '200':
-          description: Обновленное хозяйство
+          description: Обновленное домохозяйство
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/HouseholdResponse'
+        '404':
+          description: HOUSEHOLD_NOT_FOUND или MEMBERSHIP_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+        '403':
+          description: HOUSEHOLD_NOT_ACTIVE или MEMBERSHIP_NOT_ACTIVE
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
 
-  /households/{household_id}/leave:
+  /households/{householdId}/leave:
     delete:
       summary: Покинуть домохозяйство
       security:
         - BearerAuth: [ ]
       parameters:
-        - in: path
-          name: household_id
+        - name: householdId
+          in: path
           required: true
           schema:
             type: string
             format: uuid
       responses:
         '204':
-          description: Пользователь покинул домохозяйство
+          description: Пользователь покинул хозяйство
+        '404':
+          description: HOUSEHOLD_NOT_FOUND или MEMBERSHIP_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+        '403':
+          description: HOUSEHOLD_NOT_ACTIVE или MEMBERSHIP_NOT_ACTIVE
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
 
-  /households/{household_id}/members/{user_id}:
+  /api/households/{householdId}/members:
+    get:
+      summary: Получить участников хозяйства
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: householdId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Список участников
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserResponse'
+        '404':
+          description: HOUSEHOLD_NOT_FOUND или MEMBERSHIP_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+        '403':
+          description: HOUSEHOLD_NOT_ACTIVE или MEMBERSHIP_NOT_ACTIVE
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+
+  /households/{householdId}/members/{userId}:
     delete:
       summary: Удалить участника из хозяйства
       description: "Любой участник может удалить другого участника (например, если тот удалил приложение)."
       security:
         - BearerAuth: [ ]
       parameters:
-        - in: path
-          name: household_id
+        - name: householdId
+          in: path
           required: true
           schema:
             type: string
             format: uuid
-        - in: path
-          name: user_id
+        - name: userId
+          in: path
           required: true
           schema:
             type: string
             format: uuid
       responses:
         '204':
-          description: Участник удален из хозяйства
+          description: Участник удален
+        '404':
+          description: HOUSEHOLD_NOT_FOUND или MEMBERSHIP_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+        '403':
+          description: HOUSEHOLD_NOT_ACTIVE или MEMBERSHIP_NOT_ACTIVE
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+        '409':
+          description: BUSINESS_CONFLICT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
 # -----------------------------
 # Tasks, Privileges, Transactions, Activity, Leaderboard
 # (аналогично прописать CRUD эндпоинты для всех сущностей)
