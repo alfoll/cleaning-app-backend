@@ -34,7 +34,7 @@ class UserHouseholdController(
         userHouseholdService.getUserHouseholds()
 
     // получить участников хозяйства
-    @GetMapping("/{householdId}/ members")
+    @GetMapping("/{householdId}/members")
     fun getHouseholdMembers(@PathVariable householdId: UUID,): List<UserResponseDTO> =
         userHouseholdService.getHouseholdMembers(householdId)
 
