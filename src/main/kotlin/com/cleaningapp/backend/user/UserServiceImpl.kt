@@ -1,27 +1,34 @@
 package com.cleaningapp.backend.user
 
-import com.cleaningapp.backend.exception.EmailAlreadyUserException
+import com.cleaningapp.backend.exception.EmailAlreadyUsedException
 import com.cleaningapp.backend.exception.UserAlreadyExistsException
+import com.cleaningapp.backend.exception.UserNotActiveException
 import com.cleaningapp.backend.exception.UserNotFoundException
+import com.cleaningapp.backend.household.HouseholdRepository
+import com.cleaningapp.backend.userhousehold.UserHouseholdRepository
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
 @Service
+@Transactional
 class UserServiceImpl(
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val householdRepository: HouseholdRepository,
+    private val userHouseholdRepository: UserHouseholdRepository,
 ) : UserService {
 
     override fun createUser(firebaseUid: String, user: UserRegisterDTO): UserResponseDTO {
 
         // проверка что такого аккаунта не существует
         if (userRepository.findUserByFirebaseUid(firebaseUid) != null) {
-            throw UserAlreadyExistsException("Account already exists")
+            throw UserAlreadyExistsException()
         }
 
         // проверка что почта не занята
         if (userRepository.findUserByEmail(user.email) != null) {
-            throw EmailAlreadyUserException("This email is already in use")
+            throw EmailAlreadyUsedException()
         }
 
         // сохранение юзера в бд
@@ -29,18 +36,55 @@ class UserServiceImpl(
         return userRepository.save(userEntity).toDTO()
     }
 
-    // ОПАСНО, подумать
+    // еще подумать, но вроде норм (пока без задач/привилегий/транзакций/активности)
     override fun deleteUser(firebaseUid: String) {
         // проверка что юзер существует
         val user = userRepository.findUserByFirebaseUid(firebaseUid)
-            ?: throw UserNotFoundException("User does not exist")
+            ?: throw UserNotFoundException()
 
         // провера id на null на всякий случай
         val userId = user.id
             ?: throw IllegalStateException("User ID is null. Entity is not persisted.")
 
-        // как то реализовать удаление с очищением связей - мягкое?
-        return userRepository.deleteById(userId)
+        // проверка активен ли юзер вообще
+        if (!user.isActive)
+            throw UserNotActiveException()
+
+        // найти все связи с хозяйствами -> везде деактивировать и обнулить баланс
+        val userHouseholds = userHouseholdRepository.findAllByUserIdAndIsUserActiveTrue(userId)
+
+        for (userHousehold in userHouseholds) {
+            //  юзер активен в каком то хозяйстве (на уровне репозитория метод) (проверка отсюда убрана)
+
+            // обнуляем баланс
+            userHousehold.balance = 0
+
+            // деактивируем пользователя
+            userHousehold.isUserActive = false
+
+            // сохраняем изменения - вроде не нужно так как транзакционный сервис
+//            userHouseholdRepository.save(userHousehold) // не нужно?
+
+            // проверяем остались ли еще активные участники в хозяйстве
+            val household = userHousehold.household
+
+            // не нужно так как очищаю связи
+//            if (!household.isActive)
+//                throw RuntimeException("Household is not active")
+
+            val activeMembers = userHouseholdRepository.countByHouseholdIdAndIsUserActiveTrue(household.id!!)
+
+            // если нет больше активных участников то нужно деактивировать хозяйство
+            if (activeMembers == 0) {
+                household.isActive = false
+//                householdRepository.save(household)
+            }
+
+        }
+
+        // деактивировать самого юзера и сохранить изменения
+        user.isActive = false
+//        userRepository.save(user)
     }
 
     override fun updateProfile(firebaseUid: String, userNew: UserRegisterDTO): UserResponseDTO {
@@ -52,7 +96,7 @@ class UserServiceImpl(
                 val userWithEmail = userRepository.findUserByEmail(userNew.email)
                 // если такая почта уже существует - ее нельзя поставить
                 if (userWithEmail != null && userWithEmail.id != existingUser.id) {
-                    throw EmailAlreadyUserException("This email is already in use")
+                    throw EmailAlreadyUsedException()
                 }
             }
             // меняем остальное
@@ -60,20 +104,20 @@ class UserServiceImpl(
             existingUser.email = userNew.email
             existingUser.avatarUrl = userNew.avatarUrl
         } else
-            throw UserNotFoundException("User does not exist")
+            throw UserNotFoundException()
 
         return userRepository.save(existingUser).toDTO()
     }
 
     override fun findUserById(id: UUID): UserResponseDTO =
         userRepository.findByIdOrNull(id)?.toDTO()
-            ?: throw UserNotFoundException("User not found")
+            ?: throw UserNotFoundException()
 
     override fun findUserByEmail(email: String): UserResponseDTO =
         userRepository.findUserByEmail(email)?.toDTO()
-            ?: throw UserNotFoundException("User with this email not found")
+            ?: throw UserNotFoundException()
 
     override fun findUserByFirebaseUid(firebaseUid: String): UserResponseDTO =
         userRepository.findUserByFirebaseUid(firebaseUid)?.toDTO()
-            ?: throw UserNotFoundException("User with this uid not found")
+            ?: throw UserNotFoundException()
 }

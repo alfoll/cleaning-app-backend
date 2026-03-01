@@ -12,7 +12,7 @@ interface UserHouseholdRepository : JpaRepository<UserHouseholdEntity, UUID> {
     fun findAllByHouseholdIdAndIsUserActiveTrue(householdId: UUID): List<UserHouseholdEntity>
 
     // найти хозяйства в которых юзер активен (добавиь фильтрацию активности?)
-    fun findAllByUserId(userId: UUID): List<UserHouseholdEntity>
+    fun findAllByUserIdAndIsUserActiveTrue(userId: UUID): List<UserHouseholdEntity>
 
     // посчитать хозяйства в которых активен юзер (может быть максимум в трех хозяйствах)
     fun countByUserIdAndIsUserActiveTrue(userId: UUID): Int

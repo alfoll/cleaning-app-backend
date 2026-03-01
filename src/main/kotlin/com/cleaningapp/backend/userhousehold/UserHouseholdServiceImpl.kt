@@ -1,11 +1,18 @@
 package com.cleaningapp.backend.userhousehold
 
+import com.cleaningapp.backend.exception.BusinessConflictException
+import com.cleaningapp.backend.exception.HouseholdNotActiveException
+import com.cleaningapp.backend.exception.HouseholdNotFoundException
+import com.cleaningapp.backend.exception.MembershipNotActiveException
+import com.cleaningapp.backend.exception.MembershipNotFoundException
+import com.cleaningapp.backend.exception.UserNotFoundException
 import com.cleaningapp.backend.household.HouseholdRepository
 import com.cleaningapp.backend.user.UserEntity
 import com.cleaningapp.backend.user.UserRepository
 import com.cleaningapp.backend.user.UserResponseDTO
 import com.cleaningapp.backend.user.toDTO
 import org.springframework.data.repository.findByIdOrNull
+import org.springframework.security.access.AccessDeniedException
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -22,12 +29,12 @@ class UserHouseholdServiceImpl(
 
     private fun getCurrentUser(): UserEntity {
         val auth = SecurityContextHolder.getContext().authentication
-            ?: throw RuntimeException("User not authenticated")
+            ?: throw AccessDeniedException("User not authenticated")
 
         val firebaseUid = auth.name
 
         return userRepository.findUserByFirebaseUid(firebaseUid)
-            ?: throw RuntimeException("User not found")
+            ?: throw UserNotFoundException()
     }
 
     override fun joinHousehold(inviteCode: String): UserHouseholdResponseDTO {
@@ -36,29 +43,36 @@ class UserHouseholdServiceImpl(
 
         // найти хозяйство по коду (проверить есть ли такое)
         val household = householdRepository.findByInviteCode(inviteCode)
-            ?: throw RuntimeException("Household not found")
+            ?: throw HouseholdNotFoundException()
 
         // активно ли хозяйство
         if (!household.isActive)
-            throw RuntimeException("Household is not active")
+            throw HouseholdNotActiveException()
 
         // нет ли уже юзера в этом хозяйстве
         val existing = userHouseholdRepository.findByUserIdAndHouseholdId(user.id!!, household.id!!)
 
         if (existing != null && existing.isUserActive)
-            throw RuntimeException("User is already active in this household")
+            throw BusinessConflictException("User is already active in this household")
 
         // не привышел ли лимит юзеров хозяйства
         val activeMembers = userHouseholdRepository.countByHouseholdIdAndIsUserActiveTrue(household.id!!)
         if (activeMembers >= 6) // в хозяйстве максимум 6 участников
-            throw IllegalStateException("Household's member limit reached")
+            throw BusinessConflictException("Household's member limit reached")
 
         // юзер может состоять максимум в 3 хозяйствах одновременно
         val activeUserHouseholds = userHouseholdRepository.countByUserIdAndIsUserActiveTrue(user.id!!)
         if (activeUserHouseholds >= 3)
-            throw IllegalStateException("User's household limit reached")
+            throw BusinessConflictException("User's household limit reached")
 
-        // создать связь и сохранить
+        // если юзер уже был в этом хозяйстве (то есть есть неактивная запись) -> активировать
+        if (existing != null && !existing.isUserActive) {
+            existing.isUserActive = true
+            existing.balance = 0
+            return userHouseholdRepository.save(existing).toDto()
+        }
+
+        // создать связь и сохранить если пользователь новый
         val userHousehold = UserHouseholdEntity().apply {
             this.user = user
             this.household = household
@@ -72,25 +86,36 @@ class UserHouseholdServiceImpl(
 
         // найти хозяйство (проверить есть ли такое)
         val household = householdRepository.findByIdOrNull(householdId)
-            ?: throw RuntimeException("Household not found")
+            ?: throw HouseholdNotFoundException()
 
         // активно ли хозяйство
         if (!household.isActive)
-            throw RuntimeException("Household is not active")
+            throw HouseholdNotActiveException()
 
         // найти связь (проверить есть ли она)
         val userHousehold = userHouseholdRepository.findByUserIdAndHouseholdId(user.id!!, household.id!!)
-            ?: throw RuntimeException("User is not in this household")
+            ?: throw MembershipNotFoundException()
 
         // активен ли юзер в этом хозяйстве
         if (!userHousehold.isUserActive)
-            throw RuntimeException("User is not active in this household")
+            throw MembershipNotActiveException()
 
-        // сделать неактивным в хозяйстве (мягкое удаление?) или удалить запись
+        // обнулить баланс
+        userHousehold.balance = 0
+
+        // деактивировать в хозяйстве и сохранить изменения
         userHousehold.isUserActive = false
-        userHouseholdRepository.save(userHousehold) // подумать над удалением
+        userHouseholdRepository.save(userHousehold)
 
-        // если это был последний участник хозяйства - вызвать удаление хозяйства
+        // если это был последний участник хозяйства - деактивировать хозяйство хозяйства
+        val activeMembers = userHouseholdRepository.countByHouseholdIdAndIsUserActiveTrue(household.id!!)
+
+        // так как участников больше нет, а проверки все те же что и в deleteHousehold в HouseholdService
+        // -> нет смысла вызывать меод из сервиса
+        if (activeMembers == 0) {
+            household.isActive = false
+            householdRepository.save(household)
+        }
     }
 
     override fun removeUserFromHousehold(householdId: UUID, userToRemoveId: UUID) {
@@ -99,38 +124,48 @@ class UserHouseholdServiceImpl(
 
         // найти хозяйство
         val household = householdRepository.findByIdOrNull(householdId)
-            ?: throw RuntimeException("Household not found")
+            ?: throw HouseholdNotFoundException()
 
         // проверить активно ли хозяйство
         if (!household.isActive)
-            throw RuntimeException("Household is not active")
+            throw HouseholdNotActiveException()
 
         // проверить что удаляющий есть в хозяйстве
         val userHousehold = userHouseholdRepository.findByUserIdAndHouseholdId(user.id!!, household.id!!)
-            ?: throw RuntimeException("User is not in this household")
+            ?: throw MembershipNotFoundException()
 
         // проверить что удаляющий активен в хозяйстве
         if (!userHousehold.isUserActive)
-            throw RuntimeException("User is not active in this household")
+            throw MembershipNotActiveException()
 
-        // проверить что юзер имеет право удалять (создатель)
-        if (household.createdByUser.id != user.id)
-            throw RuntimeException("User cannot remove anybody from household (he is not creator)")
+        // проверить что юзер имеет право удалять (создатель) - убрала
 
         // запретить удаление самого себя (для этого leaveHousehold)
         if (user.id == userToRemoveId)
-            throw RuntimeException("You cannot remove yourself, use leaveHousehold method to leave household")
+            throw BusinessConflictException("You cannot remove yourself, use leaveHousehold method to leave household")
 
         // проверить что УДАЛЯЕМЫЙ ЮЗЕР состоит в хозяйстве
         val removedUser = userHouseholdRepository.findByUserIdAndHouseholdId(userToRemoveId, household.id!!)
-            ?: throw RuntimeException("User to remove is not member of this household")
+            ?: throw BusinessConflictException("User to remove is not member of this household")
 
         // проверить что УДАЛЯЕМЫЙ ЮЗЕР активен в хозяйстве
         if (!removedUser.isUserActive)
-            throw RuntimeException("User to remove is already not active in this household")
+            throw BusinessConflictException("User to remove is already not active in this household")
 
-        // удалить другого юзера
-        userHouseholdRepository.delete(removedUser)
+        // обнулить баланс УДАЛЯЕМОГО ЮЗЕРА в хозяйстве
+        removedUser.balance = 0
+
+        // деактивировать и сохранить изменения
+        removedUser.isUserActive = false
+        userHouseholdRepository.save(removedUser)
+
+        // на всякий случай проверить, остались ли еще участники (НЕ УВЕРЕНА НУЖНО ЛИ)
+        val activeMembers = userHouseholdRepository.countByHouseholdIdAndIsUserActiveTrue(household.id!!)
+
+        if (activeMembers == 0) {
+            household.isActive = false
+            householdRepository.save(household)
+        }
     }
 
     @Transactional(readOnly = true)
@@ -140,8 +175,8 @@ class UserHouseholdServiceImpl(
 
         // достать хозяйства (связи) в которых он активен
         return userHouseholdRepository
-            .findAllByUserId(user.id!!)
-            .filter { it.isUserActive }
+            .findAllByUserIdAndIsUserActiveTrue(user.id!!)
+            .filter { it.household.isActive } // проверка на активность хозяйств?
             .map { it.toDto() }
     }
 
@@ -149,18 +184,22 @@ class UserHouseholdServiceImpl(
     override fun getHouseholdMembers(householdId: UUID): List<UserResponseDTO> {
         // существует ли такое хозяйство
         val household = householdRepository.findByIdOrNull(householdId)
-            ?: throw RuntimeException("Household not found")
+            ?: throw HouseholdNotFoundException()
+
+        // активно ли хозяйство
+        if (!household.isActive)
+            throw HouseholdNotActiveException()
 
         // достать юзера
         val user = getCurrentUser()
 
         // состоит ли пользователь в этом хозяйстве
         val userHousehold = userHouseholdRepository.findByUserIdAndHouseholdId(user.id!!, householdId)
-            ?: throw RuntimeException("User is not in this household")
+            ?: throw MembershipNotFoundException()
 
         // активен ли юзер в хозяйстве
         if (!userHousehold.isUserActive)
-            throw RuntimeException("User is not active in this household")
+            throw MembershipNotActiveException()
 
         // вернуть список участников, активных вхозяйстве
         return userHouseholdRepository
@@ -173,21 +212,25 @@ class UserHouseholdServiceImpl(
     override fun increaseBalance(householdId: UUID, amount: Int): UserHouseholdResponseDTO {
         // amount должен быть больше 0
         if (amount <= 0)
-            throw IllegalArgumentException("Amount must be greater than 0")
+            throw BusinessConflictException("Amount must be greater than 0")
 
         // сущтвует ли хозяйство
         val household = householdRepository.findByIdOrNull(householdId)
-            ?: throw RuntimeException("Household not found")
+            ?: throw HouseholdNotFoundException()
+
+        // активно ли хозяйство
+        if (!household.isActive)
+            throw HouseholdNotActiveException()
 
         // есть ли юзер в хозяйстве
         val user = getCurrentUser()
 
         val userHousehold = userHouseholdRepository.findByUserIdAndHouseholdId(user.id!!, household.id!!)
-            ?: throw RuntimeException("User is not in this household")
+            ?: throw MembershipNotFoundException()
 
         // активен ли юзер в хозяйстве
         if (!userHousehold.isUserActive)
-            throw RuntimeException("User is not active in this household")
+            throw MembershipNotActiveException()
 
         // пополнить баланс   сохранить заново
         userHousehold.balance += amount
@@ -197,25 +240,29 @@ class UserHouseholdServiceImpl(
     override fun decreaseBalance(householdId: UUID, amount: Int): UserHouseholdResponseDTO {
         // amount должен быть больше 0
         if (amount <= 0)
-            throw IllegalArgumentException("Amount must be greater than 0")
+            throw BusinessConflictException("Amount must be greater than 0")
 
         // сущтвует ли хозяйство
         val household = householdRepository.findByIdOrNull(householdId)
-            ?: throw RuntimeException("Household not found")
+            ?: throw HouseholdNotFoundException()
+
+        // активно ли хозяйство
+        if (!household.isActive)
+            throw HouseholdNotActiveException()
 
         // есть ли юзер в хозяйстве
         val user = getCurrentUser()
 
         val userHousehold = userHouseholdRepository.findByUserIdAndHouseholdId(user.id!!, household.id!!)
-            ?: throw RuntimeException("User is not in this household")
+            ?: throw MembershipNotFoundException()
 
         // активен ли юзер в хозяйстве
         if (!userHousehold.isUserActive)
-            throw RuntimeException("User is not active in this household")
+            throw MembershipNotActiveException()
 
         // баланс должен оставаться положительным
         if (userHousehold.balance < amount)
-            throw IllegalStateException("Balance must be greater (or equal) than amount")
+            throw BusinessConflictException("Balance must be greater (or equal) than amount")
 
         // обновить баланс и сохранить
         userHousehold.balance -= amount

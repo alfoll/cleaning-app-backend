@@ -18,6 +18,7 @@ class HouseholdController(
     private val householdService: HouseholdService,
 ) {
     // нужно ли @AuthenticationPrincipal userDetails: UserDetails?
+    // - нет так как юзер березтся в сервисе из контеста
 
     // создать хозяйство
     @PostMapping
@@ -36,12 +37,6 @@ class HouseholdController(
     fun getHousehold(@PathVariable householdId: UUID): HouseholdResponseDTO =
         householdService.findHouseholdById(householdId)
 
-//    // найти хозяйство по инвайт коду - нужно ли, если это делается только при вступлении?
-//    // мб для экрана выведения хозяйства в которое вступил/вступает юзер
-//    @GetMapping("/invite")
-//    fun getInvitedHouseholds(@AuthenticationPrincipal userDetails: UserDetails,
-//                             @RequestBody invite: UserHouseholdJoinDTO) : HouseholdResponseDTO =
-//        householdService.findHouseholdByInviteCode(invite.inviteCode)
 
     // удалить
     @DeleteMapping("/{householdId}")

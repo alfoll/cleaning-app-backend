@@ -33,4 +33,7 @@ class UserEntity(
     @Column(name = "created_at", nullable = false)
     @CreationTimestamp
     var createdAt: LocalDateTime = LocalDateTime.now(),
+
+    @Column(name = "is_active", nullable = false)
+    var isActive: Boolean = true,
 )
