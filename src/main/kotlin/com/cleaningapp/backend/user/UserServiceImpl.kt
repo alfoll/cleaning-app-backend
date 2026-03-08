@@ -5,6 +5,7 @@ import com.cleaningapp.backend.exception.UserAlreadyExistsException
 import com.cleaningapp.backend.exception.UserNotActiveException
 import com.cleaningapp.backend.exception.UserNotFoundException
 import com.cleaningapp.backend.household.HouseholdRepository
+import com.cleaningapp.backend.task.TaskService
 import com.cleaningapp.backend.userhousehold.UserHouseholdRepository
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
@@ -17,6 +18,7 @@ class UserServiceImpl(
     private val userRepository: UserRepository,
     private val householdRepository: HouseholdRepository,
     private val userHouseholdRepository: UserHouseholdRepository,
+    private val taskService: TaskService,
 ) : UserService {
 
     override fun createUser(firebaseUid: String, user: UserRegisterDTO): UserResponseDTO {
@@ -55,6 +57,9 @@ class UserServiceImpl(
 
         for (userHousehold in userHouseholds) {
             //  юзер активен в каком то хозяйстве (на уровне репозитория метод) (проверка отсюда убрана)
+
+            // освободить забронированные задачи
+            taskService.releaseAssignedTasks(userHousehold.id!!)
 
             // обнуляем баланс
             userHousehold.balance = 0

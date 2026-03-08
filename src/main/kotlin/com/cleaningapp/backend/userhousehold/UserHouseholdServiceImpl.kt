@@ -7,6 +7,7 @@ import com.cleaningapp.backend.exception.MembershipNotActiveException
 import com.cleaningapp.backend.exception.MembershipNotFoundException
 import com.cleaningapp.backend.exception.UserNotFoundException
 import com.cleaningapp.backend.household.HouseholdRepository
+import com.cleaningapp.backend.task.TaskService
 import com.cleaningapp.backend.user.UserEntity
 import com.cleaningapp.backend.user.UserRepository
 import com.cleaningapp.backend.user.UserResponseDTO
@@ -24,6 +25,7 @@ class UserHouseholdServiceImpl(
     private val userHouseholdRepository: UserHouseholdRepository,
     private val householdRepository: HouseholdRepository,
     private val userRepository: UserRepository,
+    private val taskService: TaskService,
 ) : UserHouseholdService {
     // user и household при использовании в сервисах уже есть в бд, значит id точно не null -> можно использовать !!
 
@@ -100,6 +102,9 @@ class UserHouseholdServiceImpl(
         if (!userHousehold.isUserActive)
             throw MembershipNotActiveException()
 
+        // освободить забронированные задачи
+        taskService.releaseAssignedTasks(userHousehold.id!!)
+
         // обнулить баланс
         userHousehold.balance = 0
 
@@ -151,6 +156,9 @@ class UserHouseholdServiceImpl(
         // проверить что УДАЛЯЕМЫЙ ЮЗЕР активен в хозяйстве
         if (!removedUser.isUserActive)
             throw BusinessConflictException("User to remove is already not active in this household")
+
+        // освободить забронированные задачи
+        taskService.releaseAssignedTasks(removedUser.id!!)
 
         // обнулить баланс УДАЛЯЕМОГО ЮЗЕРА в хозяйстве
         removedUser.balance = 0
