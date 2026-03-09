@@ -2,10 +2,13 @@ package com.cleaningapp.backend.exception
 
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.HttpStatus
+import org.springframework.http.converter.HttpMessageNotReadableException
 import org.springframework.security.access.AccessDeniedException
+import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestControllerAdvice
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
 
 @RestControllerAdvice
 class GlobalExceptionHandler {
@@ -65,6 +68,13 @@ class GlobalExceptionHandler {
         return ExcResponse("403 MEMBERSHIP_NOT_ACTIVE", e.message)
     }
 
+    // задача не найдена
+    @ExceptionHandler(TaskNotFoundException::class)
+    @ResponseStatus(HttpStatus.NOT_FOUND) // 404
+    fun handleTaskNotFoundException(e: TaskNotFoundException): ExcResponse {
+        return ExcResponse("404 TASK_NOT_FOUND", e.message)
+    }
+
     // конфликты бизнес логики
     @ExceptionHandler(BusinessConflictException::class)
     @ResponseStatus(HttpStatus.CONFLICT) // 409
@@ -83,7 +93,36 @@ class GlobalExceptionHandler {
     @ExceptionHandler(DataIntegrityViolationException::class)
     @ResponseStatus(HttpStatus.CONFLICT) // 409
     fun handleDataIntegrityViolationException(e: DataIntegrityViolationException): ExcResponse {
-        return ExcResponse("404 DATA_INTEGRITY_VIOLATION", e.message)
+        return ExcResponse("409 DATA_INTEGRITY_VIOLATION", e.message)
+    }
+
+    // валидация дто
+    @ExceptionHandler(MethodArgumentNotValidException::class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST) // 400
+    fun handleMethodArgumentNotValidException(e: MethodArgumentNotValidException): ExcResponse {
+        val message = e.bindingResult.fieldErrors.joinToString("; ") { "${it.field}: ${it.defaultMessage}" }
+        return ExcResponse("400 VALIDATION_ERROR", message)
+    }
+
+    // неправильные query/path параметры
+    @ExceptionHandler(MethodArgumentTypeMismatchException::class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST) // 400
+    fun handleMethodArgumentTypeMismatchException(e: MethodArgumentTypeMismatchException): ExcResponse {
+        val message = when {
+            e.requiredType?.isEnum == true ->
+                "Invalid value '${e.value}' for parameter '${e.name}'"
+
+            else ->
+                "Invalid value '${e.value}' for parameter '${e.name}'"
+        }
+        return ExcResponse("400 INVALID_PARAMETER", message)
+    }
+
+    // битый JSON / неверный enum в body
+    @ExceptionHandler(HttpMessageNotReadableException::class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST) // 400
+    fun handleHttpMessageNotReadableException(e: HttpMessageNotReadableException): ExcResponse {
+        return ExcResponse("400 MALFORMED_REQUEST", "Request body is invalid or malformed")
     }
 
     // остальной рандом
