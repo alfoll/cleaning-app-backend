@@ -1,6 +1,7 @@
 package com.cleaningapp.backend.userhousehold
 
 import com.cleaningapp.backend.user.UserResponseDTO
+import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
@@ -19,7 +20,7 @@ class UserHouseholdController(
 ) {
     // вступить в хозяйство
     @PostMapping("/join")
-    fun joinHousehold(@RequestBody join: UserHouseholdJoinDTO,): UserHouseholdResponseDTO =
+    fun joinHousehold(@Valid @RequestBody join: UserHouseholdJoinDTO,): UserHouseholdResponseDTO =
         userHouseholdService.joinHousehold(join.inviteCode)
 
     // выйти из хозяйства

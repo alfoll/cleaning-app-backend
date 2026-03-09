@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
+import org.springframework.security.access.AccessDeniedException
+
 
 @RestController
 @RequestMapping(value = ["/api/auth"])
@@ -21,10 +23,10 @@ class AuthController(
         // fb uid берется из токена и помещается в UserDetails (ранее было Principal),
         // тут берется из созданного в фильтре объекта UserDetails
                  @AuthenticationPrincipal userDetails: UserDetails?): UserResponseDTO {
-        if (userDetails == null) {
-            throw RuntimeException("Principal is null")
-        }
-            return userService.createUser(userDetails.username, user)
+        val principal = userDetails
+            ?: throw AccessDeniedException("Authenticated principal is required")
+
+            return userService.createUser(principal.username, user)
     }
 }
 // было Principal стало UserDetails
