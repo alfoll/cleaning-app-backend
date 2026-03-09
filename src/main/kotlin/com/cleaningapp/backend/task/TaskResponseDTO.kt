@@ -13,7 +13,7 @@ data class TaskResponseDTO(
     val description: String? = null,
     val reward: Int,
 
-    val isAssigned: Boolean = false,
+    val isAssigned: Boolean = false, // в сущности нет, только в дто для облегчения
     val assignedTo: UUID? = null,
     val assignedAt: LocalDateTime? = null,
 

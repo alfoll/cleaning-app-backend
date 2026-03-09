@@ -167,7 +167,7 @@ class UserHouseholdServiceImpl(
         removedUser.isUserActive = false
         userHouseholdRepository.save(removedUser)
 
-        // на всякий случай проверить, остались ли еще участники (НЕ УВЕРЕНА НУЖНО ЛИ)
+        // на всякий случай проверить, остались ли еще участники (НЕ УВЕРЕНА НУЖНО ЛИ) - удалить потом мб
         val activeMembers = userHouseholdRepository.countByHouseholdIdAndIsUserActiveTrue(household.id!!)
 
         if (activeMembers == 0) {
@@ -216,7 +216,7 @@ class UserHouseholdServiceImpl(
 
     }
 
-
+    // в транзакции, тут не нужны
     override fun increaseBalance(householdId: UUID, amount: Int): UserHouseholdResponseDTO {
         // amount должен быть больше 0
         if (amount <= 0)
@@ -245,6 +245,7 @@ class UserHouseholdServiceImpl(
         return userHouseholdRepository.save(userHousehold).toDto()
     }
 
+    // в транзакции, тут не нужны
     override fun decreaseBalance(householdId: UUID, amount: Int): UserHouseholdResponseDTO {
         // amount должен быть больше 0
         if (amount <= 0)

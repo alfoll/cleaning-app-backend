@@ -1,9 +1,11 @@
 package com.cleaningapp.backend.task
 
+import com.cleaningapp.backend.exception.BusinessConflictException
 import com.cleaningapp.backend.exception.HouseholdNotActiveException
 import com.cleaningapp.backend.exception.HouseholdNotFoundException
 import com.cleaningapp.backend.exception.MembershipNotActiveException
 import com.cleaningapp.backend.exception.MembershipNotFoundException
+import com.cleaningapp.backend.exception.TaskNotFoundException
 import com.cleaningapp.backend.exception.UserNotFoundException
 import com.cleaningapp.backend.household.HouseholdEntity
 import com.cleaningapp.backend.household.HouseholdRepository
@@ -75,7 +77,7 @@ class TaskServiceImpl(
     // достать сущность задачи
     private fun getTaskEntity(taskId: UUID): TaskEntity =
         taskRepository.findByIdOrNull(taskId)
-            ?: throw RuntimeException("Task not found")
+            ?: throw TaskNotFoundException()
 
     // проверить что пользователь состоит в хозяйстве в котором хочет взять задачу
     private fun validateTaskAccess(task: TaskEntity, currentUser: UserEntity): UserHouseholdEntity {
@@ -115,12 +117,11 @@ class TaskServiceImpl(
 
         // если задача выполнена - нельзя менять
         if (task.isCompleted)
-            throw RuntimeException("Completed task cannot be updated")
+            throw BusinessConflictException("Completed task cannot be updated")
 
-        // если задачазабронирована - нельзя менять
-        // как лучше сделать - через такую проверку или все таки добавить поле isAssigned?
+        // если задача забронирована - нельзя менять
         if (task.assignedTo != null)
-            throw RuntimeException("Assigned task cannot be updated")
+            throw BusinessConflictException("Assigned task cannot be updated")
 
         // обновляем (название/описание/награду) и сохранем
         task.title = newTask.title
@@ -143,11 +144,11 @@ class TaskServiceImpl(
 
         // нельзя удалять выполненную задачу
         if (task.isCompleted)
-            throw RuntimeException("Completed task cannot be deleted")
+            throw BusinessConflictException("Completed task cannot be deleted")
 
         // нельзя удалять забронированную задачу
         if (task.assignedTo != null)
-            throw RuntimeException("Assigned task cannot be deleted")
+            throw BusinessConflictException("Assigned task cannot be deleted")
 
         taskRepository.delete(task) // как реализовать удаление - жестко или как с юзерами и хозяйствами (мягко)?
     }
@@ -165,11 +166,11 @@ class TaskServiceImpl(
 
         // нельзя забронировать выполненную задачу
         if (task.isCompleted)
-            throw RuntimeException("Completed task cannot be assigned")
+            throw BusinessConflictException("Completed task cannot be assigned")
 
         // нельзя забронировать уже забронированную задачу
         if (task.assignedTo != null)
-            throw RuntimeException("Assigned task cannot be assigned")
+            throw BusinessConflictException("Assigned task cannot be assigned")
 
         // бронируемза собой
         task.assignedTo = membership
@@ -191,15 +192,15 @@ class TaskServiceImpl(
 
         // нельзя освободить выполненную задачу
         if (task.isCompleted)
-            throw RuntimeException("Completed task cannot be unassigned")
+            throw BusinessConflictException("Completed task cannot be unassigned")
 
         // нельзя освободить незабронированную задачу
         if (task.assignedTo == null)
-            throw RuntimeException("Unassigned task cannot be unassigned")
+            throw BusinessConflictException("Unassigned task cannot be unassigned")
 
         // нельзя освободить НЕ СВОЮ задачу (задача прикреплена к участию а не к юзеру)
         if (task.assignedTo?.id != membership.id)
-            throw RuntimeException("Only assigned user can unassign this task")
+            throw BusinessConflictException("Only assigned user can unassign this task")
 
         // освобождаем + сохраняем
         task.assignedTo = null
@@ -208,7 +209,7 @@ class TaskServiceImpl(
         return taskRepository.save(task).toDto()
     }
 
-    // задача должна быть забронирована чтобы ее завершить ????
+    // задача должна быть забронирована чтобы ее завершить
     // после завершения начисляется награда
     // НАЧИСЛЕНИЕ ВЫНЕСТИ В СЕРВИС ТРАНЗАКЦИЙ
     override fun completeTask(taskId: UUID): TaskResponseDTO {
@@ -223,27 +224,27 @@ class TaskServiceImpl(
 
         // нельзя завершить уже завершенную задачу
         if (task.isCompleted)
-            throw RuntimeException("Completed task cannot be completed")
+            throw BusinessConflictException("Completed task cannot be completed")
 
         // нельзя завершить НЕзабронированную задачу
         if (task.assignedTo == null)
-            throw RuntimeException("Unassigned task cannot be completed")
+            throw BusinessConflictException("Unassigned task cannot be completed")
 
         // нельзя завешить задачу если ее бронировал кто то другой
         if (task.assignedTo?.id != membership.id)
-            throw RuntimeException("Only assigned user can complete this task")
+            throw BusinessConflictException("Only assigned user can complete this task")
 
         // завершаем задачу
         task.isCompleted = true
         task.completedBy = membership
         task.completedAt = LocalDateTime.now()
-        // бронь оставить как есть и не менять? - наверное лучше сбросить - или для истории отавить?
+
+        // бронь сбрасываем, она больше не нужна, в истории сохранится
         task.assignedTo = null
         task.assignedAt = null
 
-        // начисление капусты на баланс - через репозиторий или через сервис?
-//        userHouseholdService.increaseBalance(membership.household.id!!, task.reward)
-        // решено через репозиторий - разобраться
+        // начисление капусты на баланс - через репозиторий
+        // (далее в сервисе UserHouseholdService не будет методов изменения баланса) - задача транзакций
         membership.balance += task.reward
         userHouseholdRepository.save(membership)
 
@@ -264,8 +265,9 @@ class TaskServiceImpl(
         return task.toDto()
     }
 
-    // сделать с фильтром или отдельно по методам
-    // все/выполненные/забронированные/свободные/мои/мои-забронированные/мои-выполненные - как сделать?
+    // через фильтр а не отдельными методами
+    // все/выполненные/забронированные другими/свободные/мои/мои-забронированные/мои-выполненные - мб сделать такой набор
+    // на данном этапе - все/свободные/выполненные/мои (забронированные мной)
     @Transactional(readOnly = true)
     override fun getHouseholdTasks(householdId: UUID, filter: TaskFilterType): List<TaskResponseDTO> {
         // достать юзера
@@ -280,26 +282,26 @@ class TaskServiceImpl(
         // сформировать список задач по запросу фильтра
         val tasks = when (filter) {
             TaskFilterType.ALL -> // все
-                taskRepository.findAllByHouseholdId(household.id!!)
+                taskRepository.findAllByHouseholdIdOrderByCreatedAtDesc(household.id!!)
 
-            TaskFilterType.FREE -> // не заброненные и не выполненные
-                taskRepository.findAllByHouseholdIdAndAssignedToIsNullAndIsCompletedFalse(household.id!!)
+            TaskFilterType.FREE -> // все не заброненные и не выполненные
+                taskRepository.findAllByHouseholdIdAndAssignedToIsNullAndIsCompletedFalseOrderByCreatedAtDesc(household.id!!)
 
             TaskFilterType.MY -> // мои заброненные - через участие а не через юзера
-                taskRepository.findAllByHouseholdIdAndAssignedToIdAndIsCompletedFalse(
+                taskRepository.findAllByHouseholdIdAndAssignedToIdAndIsCompletedFalseOrderByAssignedAtDesc(
                     household.id!!,
                     membership.id!!
                 )
 
             TaskFilterType.COMPLETED -> // все выполненные
-                taskRepository.findAllByHouseholdIdAndIsCompletedTrue(household.id!!)
+                taskRepository.findAllByHouseholdIdAndIsCompletedTrueOrderByCompletedAtDesc(household.id!!)
         }
 
         return tasks.map { it.toDto() }
     }
 
     // для UserHouseholdService - при удалении/выходе пользователя - через участие
-    // подумать - а то не оч понятно
+    // для UserService - приудалении пользователя из системы - через участие
     override fun releaseAssignedTasks(userHouseholdId: UUID) {
         // достали все незавершенные задачи участника
         val tasks = taskRepository.findAllByAssignedToIdAndIsCompletedFalse(userHouseholdId)

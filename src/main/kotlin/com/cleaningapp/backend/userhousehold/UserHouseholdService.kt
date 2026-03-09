@@ -9,7 +9,7 @@ interface UserHouseholdService {
     fun joinHousehold(inviteCode: String): UserHouseholdResponseDTO
     fun leaveHousehold(householdId: UUID)
 
-    //удалить участника может только создатель
+    //удалить участника может НЕ только создатель
     fun removeUserFromHousehold(householdId: UUID, userToRemoveId: UUID)
 
     fun getUserHouseholds(): List<UserHouseholdResponseDTO>
