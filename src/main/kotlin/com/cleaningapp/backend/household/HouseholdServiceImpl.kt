@@ -5,6 +5,7 @@ import com.cleaningapp.backend.exception.HouseholdNotActiveException
 import com.cleaningapp.backend.exception.HouseholdNotFoundException
 import com.cleaningapp.backend.exception.MembershipNotActiveException
 import com.cleaningapp.backend.exception.MembershipNotFoundException
+import com.cleaningapp.backend.exception.UserNotActiveException
 import com.cleaningapp.backend.exception.UserNotFoundException
 import com.cleaningapp.backend.user.UserEntity
 import com.cleaningapp.backend.user.UserRepository
@@ -52,8 +53,12 @@ class HouseholdServiceImpl(
 
         val firebaseUid = auth.name
 
-        return userRepository.findUserByFirebaseUid(firebaseUid)
+        val user = userRepository.findUserByFirebaseUid(firebaseUid)
             ?: throw UserNotFoundException()
+
+        if (!user.isActive)
+            throw UserNotActiveException()
+        return user
     }
 
     override fun createHousehold(household: HouseholdRegisterDTO): HouseholdResponseDTO {

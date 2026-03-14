@@ -5,6 +5,7 @@ import com.cleaningapp.backend.exception.HouseholdNotActiveException
 import com.cleaningapp.backend.exception.HouseholdNotFoundException
 import com.cleaningapp.backend.exception.MembershipNotActiveException
 import com.cleaningapp.backend.exception.MembershipNotFoundException
+import com.cleaningapp.backend.exception.UserNotActiveException
 import com.cleaningapp.backend.exception.UserNotFoundException
 import com.cleaningapp.backend.household.HouseholdRepository
 import com.cleaningapp.backend.task.TaskService
@@ -35,8 +36,12 @@ class UserHouseholdServiceImpl(
 
         val firebaseUid = auth.name
 
-        return userRepository.findUserByFirebaseUid(firebaseUid)
+        val user = userRepository.findUserByFirebaseUid(firebaseUid)
             ?: throw UserNotFoundException()
+
+        if (!user.isActive)
+            throw UserNotActiveException()
+        return user
     }
 
     override fun joinHousehold(inviteCode: String): UserHouseholdResponseDTO {
@@ -216,65 +221,65 @@ class UserHouseholdServiceImpl(
 
     }
 
-    // в транзакции, тут не нужны
-    override fun increaseBalance(householdId: UUID, amount: Int): UserHouseholdResponseDTO {
-        // amount должен быть больше 0
-        if (amount <= 0)
-            throw BusinessConflictException("Amount must be greater than 0")
-
-        // сущтвует ли хозяйство
-        val household = householdRepository.findByIdOrNull(householdId)
-            ?: throw HouseholdNotFoundException()
-
-        // активно ли хозяйство
-        if (!household.isActive)
-            throw HouseholdNotActiveException()
-
-        // есть ли юзер в хозяйстве
-        val user = getCurrentUser()
-
-        val userHousehold = userHouseholdRepository.findByUserIdAndHouseholdId(user.id!!, household.id!!)
-            ?: throw MembershipNotFoundException()
-
-        // активен ли юзер в хозяйстве
-        if (!userHousehold.isUserActive)
-            throw MembershipNotActiveException()
-
-        // пополнить баланс   сохранить заново
-        userHousehold.balance += amount
-        return userHouseholdRepository.save(userHousehold).toDto()
-    }
-
-    // в транзакции, тут не нужны
-    override fun decreaseBalance(householdId: UUID, amount: Int): UserHouseholdResponseDTO {
-        // amount должен быть больше 0
-        if (amount <= 0)
-            throw BusinessConflictException("Amount must be greater than 0")
-
-        // сущтвует ли хозяйство
-        val household = householdRepository.findByIdOrNull(householdId)
-            ?: throw HouseholdNotFoundException()
-
-        // активно ли хозяйство
-        if (!household.isActive)
-            throw HouseholdNotActiveException()
-
-        // есть ли юзер в хозяйстве
-        val user = getCurrentUser()
-
-        val userHousehold = userHouseholdRepository.findByUserIdAndHouseholdId(user.id!!, household.id!!)
-            ?: throw MembershipNotFoundException()
-
-        // активен ли юзер в хозяйстве
-        if (!userHousehold.isUserActive)
-            throw MembershipNotActiveException()
-
-        // баланс должен оставаться положительным
-        if (userHousehold.balance < amount)
-            throw BusinessConflictException("Balance must be greater (or equal) than amount")
-
-        // обновить баланс и сохранить
-        userHousehold.balance -= amount
-        return userHouseholdRepository.save(userHousehold).toDto()
-    }
+//    // в транзакции, тут не нужны
+//    override fun increaseBalance(householdId: UUID, amount: Int): UserHouseholdResponseDTO {
+//        // amount должен быть больше 0
+//        if (amount <= 0)
+//            throw BusinessConflictException("Amount must be greater than 0")
+//
+//        // сущтвует ли хозяйство
+//        val household = householdRepository.findByIdOrNull(householdId)
+//            ?: throw HouseholdNotFoundException()
+//
+//        // активно ли хозяйство
+//        if (!household.isActive)
+//            throw HouseholdNotActiveException()
+//
+//        // есть ли юзер в хозяйстве
+//        val user = getCurrentUser()
+//
+//        val userHousehold = userHouseholdRepository.findByUserIdAndHouseholdId(user.id!!, household.id!!)
+//            ?: throw MembershipNotFoundException()
+//
+//        // активен ли юзер в хозяйстве
+//        if (!userHousehold.isUserActive)
+//            throw MembershipNotActiveException()
+//
+//        // пополнить баланс   сохранить заново
+//        userHousehold.balance += amount
+//        return userHouseholdRepository.save(userHousehold).toDto()
+//    }
+//
+//    // в транзакции, тут не нужны
+//    override fun decreaseBalance(householdId: UUID, amount: Int): UserHouseholdResponseDTO {
+//        // amount должен быть больше 0
+//        if (amount <= 0)
+//            throw BusinessConflictException("Amount must be greater than 0")
+//
+//        // сущтвует ли хозяйство
+//        val household = householdRepository.findByIdOrNull(householdId)
+//            ?: throw HouseholdNotFoundException()
+//
+//        // активно ли хозяйство
+//        if (!household.isActive)
+//            throw HouseholdNotActiveException()
+//
+//        // есть ли юзер в хозяйстве
+//        val user = getCurrentUser()
+//
+//        val userHousehold = userHouseholdRepository.findByUserIdAndHouseholdId(user.id!!, household.id!!)
+//            ?: throw MembershipNotFoundException()
+//
+//        // активен ли юзер в хозяйстве
+//        if (!userHousehold.isUserActive)
+//            throw MembershipNotActiveException()
+//
+//        // баланс должен оставаться положительным
+//        if (userHousehold.balance < amount)
+//            throw BusinessConflictException("Balance must be greater (or equal) than amount")
+//
+//        // обновить баланс и сохранить
+//        userHousehold.balance -= amount
+//        return userHouseholdRepository.save(userHousehold).toDto()
+//    }
 }

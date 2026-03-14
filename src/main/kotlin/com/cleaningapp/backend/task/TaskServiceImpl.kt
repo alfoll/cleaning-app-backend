@@ -6,6 +6,7 @@ import com.cleaningapp.backend.exception.HouseholdNotFoundException
 import com.cleaningapp.backend.exception.MembershipNotActiveException
 import com.cleaningapp.backend.exception.MembershipNotFoundException
 import com.cleaningapp.backend.exception.TaskNotFoundException
+import com.cleaningapp.backend.exception.UserNotActiveException
 import com.cleaningapp.backend.exception.UserNotFoundException
 import com.cleaningapp.backend.household.HouseholdEntity
 import com.cleaningapp.backend.household.HouseholdRepository
@@ -44,8 +45,12 @@ class TaskServiceImpl(
 
         val firebaseUid = auth.name
 
-        return userRepository.findUserByFirebaseUid(firebaseUid)
+        val user = userRepository.findUserByFirebaseUid(firebaseUid)
             ?: throw UserNotFoundException()
+
+        if (!user.isActive)
+            throw UserNotActiveException()
+        return user
     }
 
     // достать активное хозяйсто
@@ -98,6 +103,7 @@ class TaskServiceImpl(
         // проверить состоит ли юзер в хозяйстве и активен ли в нем
         getActiveMembership(user.id!!, household.id!!)
 
+        // если id хозяйства
         // если такая задача уже есть - похуй может быть и вторая - сохраняем
         return taskRepository.save(task.toTaskEntity(user, household)).toDto()
     }
