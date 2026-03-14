@@ -123,13 +123,13 @@ components:
         id:
           type: string
           format: uuid
-        household_id:
+        householdId:
           type: string
           format: uuid
-        created_by:
+        createdBy:
           type: string
           format: uuid
-        created_at:
+        createdAt:
           type: string
           format: date-time
         title:
@@ -139,21 +139,21 @@ components:
           nullable: true
         reward:
           type: integer
-        assigned_to:
+        assignedTo:
           type: string
           format: uuid
           nullable: true
-        assigned_at:
+        assignedAt:
           type: string
           format: date-time
           nullable: true
-        is_completed:
+        isCompleted:
           type: boolean
-        completed_by:
+        completedBy:
           type: string
           format: uuid
           nullable: true
-        completed_at:
+        completedAt:
           type: string
           format: date-time
           nullable: true
@@ -166,9 +166,12 @@ components:
       properties:
         title:
           type: string
+          minLength: 2
+          maxLength: 120
         description:
           type: string
           nullable: true
+          maxLength: 2000
         reward:
           type: integer
           minimum: 5
@@ -397,6 +400,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ExcResponse'
 
+  /households/myHouseholds:
     get:
       summary: Получить список домохозяйств пользователя
       security:
@@ -576,7 +580,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ExcResponse'
 
-  /api/households/{householdId}/members:
+  /households/{householdId}/members:
     get:
       summary: Получить участников хозяйства
       security:
@@ -610,7 +614,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ExcResponse'
 
-  /households/{householdId}/members/{userId}:
+  /households/{householdId}/members/{userToRemoveId}:
     delete:
       summary: Удалить участника из хозяйства
       description: "Любой участник может удалить другого участника (например, если тот удалил приложение)."
@@ -640,6 +644,336 @@ paths:
                 $ref: '#/components/schemas/ExcResponse'
         '403':
           description: HOUSEHOLD_NOT_ACTIVE или MEMBERSHIP_NOT_ACTIVE
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+        '409':
+          description: BUSINESS_CONFLICT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+
+  # -----------------------------
+  # Tasks
+  # -----------------------------
+  /households/{householdId}/tasks:
+    post:
+      summary: Создать задачу в домохозяйстве
+      security:
+        - BearerAuth: [ ]
+      parameters:
+        - name: householdId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskCreateRequest'
+      responses:
+        '201':
+          description: Задача создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '400':
+          description: VALIDATION_ERROR или MALFORMED_REQUEST
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+        '404':
+          description: HOUSEHOLD_NOT_FOUND или MEMBERSHIP_NOT_FOUND или USER_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+        '403':
+          description: USER_NOT_ACTIVE или HOUSEHOLD_NOT_ACTIVE или MEMBERSHIP_NOT_ACTIVE или ACCESS_DENIED
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+
+    get:
+      summary: Получить список задач домохозяйства с фильтрацией
+      security:
+        - BearerAuth: [ ]
+      parameters:
+        - name: householdId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: filter
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [ALL, FREE, MY, COMPLETED]
+            default: ALL
+      responses:
+        '200':
+          description: Список задач
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TaskResponse'
+        '400':
+          description: INVALID_PARAMETER
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+        '404':
+          description: HOUSEHOLD_NOT_FOUND или MEMBERSHIP_NOT_FOUND или USER_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+        '403':
+          description: USER_NOT_ACTIVE или HOUSEHOLD_NOT_ACTIVE или MEMBERSHIP_NOT_ACTIVE или ACCESS_DENIED
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+
+  /tasks/{taskId}:
+    get:
+      summary: Получить задачу по id
+      security:
+        - BearerAuth: [ ]
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Информация о задаче
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '404':
+          description: TASK_NOT_FOUND или MEMBERSHIP_NOT_FOUND или USER_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+        '403':
+          description: USER_NOT_ACTIVE или HOUSEHOLD_NOT_ACTIVE или MEMBERSHIP_NOT_ACTIVE или ACCESS_DENIED
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+
+    put:
+      summary: Обновить свободную задачу
+      description: >
+        Обновить можно только задачу, которая еще не забронирована и не выполнена.
+      security:
+        - BearerAuth: [ ]
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskCreateRequest'
+      responses:
+        '200':
+          description: Обновленная задача
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '400':
+          description: VALIDATION_ERROR или MALFORMED_REQUEST
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+        '404':
+          description: TASK_NOT_FOUND или MEMBERSHIP_NOT_FOUND или USER_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+        '403':
+          description: USER_NOT_ACTIVE или HOUSEHOLD_NOT_ACTIVE или MEMBERSHIP_NOT_ACTIVE или ACCESS_DENIED
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+        '409':
+          description: BUSINESS_CONFLICT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+
+    delete:
+      summary: Удалить свободную задачу
+      description: >
+        Удалить можно только задачу, которая еще не забронирована и не выполнена.
+      security:
+        - BearerAuth: [ ]
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Задача успешно удалена
+        '404':
+          description: TASK_NOT_FOUND или MEMBERSHIP_NOT_FOUND или USER_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+        '403':
+          description: USER_NOT_ACTIVE или HOUSEHOLD_NOT_ACTIVE или MEMBERSHIP_NOT_ACTIVE или ACCESS_DENIED
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+        '409':
+          description: BUSINESS_CONFLICT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+
+  /tasks/{taskId}/assign:
+    post:
+      summary: Забронировать задачу за текущим пользователем
+      security:
+        - BearerAuth: [ ]
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Задача забронирована
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '404':
+          description: TASK_NOT_FOUND или MEMBERSHIP_NOT_FOUND или USER_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+        '403':
+          description: USER_NOT_ACTIVE или HOUSEHOLD_NOT_ACTIVE или MEMBERSHIP_NOT_ACTIVE или ACCESS_DENIED
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+        '409':
+          description: BUSINESS_CONFLICT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+
+  /tasks/{taskId}/unassign:
+    post:
+      summary: Снять бронь с задачи
+      description: >
+        Снять бронь может только тот пользователь, который забронировал задачу.
+      security:
+        - BearerAuth: [ ]
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Бронь с задачи снята
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '404':
+          description: TASK_NOT_FOUND или MEMBERSHIP_NOT_FOUND или USER_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+        '403':
+          description: USER_NOT_ACTIVE или HOUSEHOLD_NOT_ACTIVE или MEMBERSHIP_NOT_ACTIVE или ACCESS_DENIED
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+        '409':
+          description: BUSINESS_CONFLICT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+
+  /tasks/{taskId}/complete:
+    post:
+      summary: Завершить задачу
+      description: >
+        Завершить можно только задачу, которая уже забронирована текущим пользователем.
+        После завершения задача помечается выполненной, бронь снимается, а пользователю начисляется награда.
+      security:
+        - BearerAuth: [ ]
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Задача выполнена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '404':
+          description: TASK_NOT_FOUND или MEMBERSHIP_NOT_FOUND или USER_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExcResponse'
+        '403':
+          description: USER_NOT_ACTIVE или HOUSEHOLD_NOT_ACTIVE или MEMBERSHIP_NOT_ACTIVE или ACCESS_DENIED
           content:
             application/json:
               schema:
