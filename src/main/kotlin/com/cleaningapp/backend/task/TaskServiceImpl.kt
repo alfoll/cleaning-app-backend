@@ -109,6 +109,7 @@ class TaskServiceImpl(
     }
 
     // нельзя менять условия задачи если она взята в работу (забронена) или выполнена
+    // только создатель может менять задачу
     override fun updateTask(taskId: UUID, newTask: TaskRegisterDTO): TaskResponseDTO {
         // достать юзера - поему не достаем активное хозяйство?
         // потому что в валидации доступа берется уже существующее хозяйтство задачи проверяется его активность
@@ -129,6 +130,10 @@ class TaskServiceImpl(
         if (task.assignedTo != null)
             throw BusinessConflictException("Assigned task cannot be updated")
 
+        // если не создатель - нельзя менять
+        if (task.createdBy.id != user.id)
+            throw BusinessConflictException("Only creator can update task")
+
         // обновляем (название/описание/награду) и сохранем
         task.title = newTask.title
         task.description = newTask.description
@@ -138,6 +143,7 @@ class TaskServiceImpl(
     }
 
     // массовая сущность - если свободна то можно жестко удалить
+    // только создатель может удалять задачу
     override fun deleteTask(taskId: UUID) {
         // достать юзера
         val user = getCurrentUser()
@@ -155,6 +161,10 @@ class TaskServiceImpl(
         // нельзя удалять забронированную задачу
         if (task.assignedTo != null)
             throw BusinessConflictException("Assigned task cannot be deleted")
+
+        // если не создатель - нельзя удалить
+        if (task.createdBy.id != user.id)
+            throw BusinessConflictException("Only creator can delete task")
 
         taskRepository.delete(task) // как реализовать удаление - жестко или как с юзерами и хозяйствами (мягко)?
     }

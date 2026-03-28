@@ -14,10 +14,10 @@ data class TaskResponseDTO(
     val reward: Int,
 
     val isAssigned: Boolean = false, // в сущности нет, только в дто для облегчения
-    val assignedTo: UUID? = null,
+    val assignedTo: UUID? = null, // в реальности UserHousehold.id, но тут отдается User.id
     val assignedAt: LocalDateTime? = null,
 
     val isCompleted: Boolean = false,
-    val completedBy: UUID? = null,
+    val completedBy: UUID? = null, // в реальности UserHousehold.id, но тут отдается User.id
     val completedAt: LocalDateTime? = null,
 )
