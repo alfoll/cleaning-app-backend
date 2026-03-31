@@ -18,8 +18,12 @@ import java.time.LocalDateTime
 import java.util.UUID
 
 @Entity
-@Table(name = "user_household",
-    uniqueConstraints = [UniqueConstraint(columnNames = ["user_id", "household_id"])])
+@Table(
+    name = "user_household",
+    uniqueConstraints = [
+        UniqueConstraint(columnNames = ["user_id", "household_id"])
+    ]
+)
 class UserHouseholdEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

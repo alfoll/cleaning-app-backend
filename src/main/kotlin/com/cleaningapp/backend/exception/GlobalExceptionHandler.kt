@@ -75,6 +75,13 @@ class GlobalExceptionHandler {
         return ExcResponse("404 TASK_NOT_FOUND", e.message)
     }
 
+    // привилегия не найдена
+    @ExceptionHandler(PrivilegeNotFoundException::class)
+    @ResponseStatus(HttpStatus.NOT_FOUND) // 404
+    fun handlePrivilegeNotFoundException(e: PrivilegeNotFoundException): ExcResponse {
+        return ExcResponse("404 PRIVILEGE_NOT_FOUND", e.message)
+    }
+
     // конфликты бизнес логики
     @ExceptionHandler(BusinessConflictException::class)
     @ResponseStatus(HttpStatus.CONFLICT) // 409
