@@ -7,6 +7,9 @@ import com.cleaningapp.backend.exception.MembershipNotActiveException
 import com.cleaningapp.backend.exception.MembershipNotFoundException
 import com.cleaningapp.backend.exception.UserNotActiveException
 import com.cleaningapp.backend.exception.UserNotFoundException
+import com.cleaningapp.backend.task.TaskService
+import com.cleaningapp.backend.transaction.BalanceResetTransactionCommand
+import com.cleaningapp.backend.transaction.TransactionService
 import com.cleaningapp.backend.user.UserEntity
 import com.cleaningapp.backend.user.UserRepository
 import com.cleaningapp.backend.userhousehold.UserHouseholdEntity
@@ -24,6 +27,9 @@ class HouseholdServiceImpl(
     private val householdRepository: HouseholdRepository,
     private val userRepository: UserRepository,
     private val userHouseholdRepository: UserHouseholdRepository,
+
+    private val taskService: TaskService,
+    private val transactionService: TransactionService,
 ) : HouseholdService {
 
     // генерация кода из символов
@@ -112,14 +118,22 @@ class HouseholdServiceImpl(
         val members = userHouseholdRepository.findAllByHouseholdIdAndIsUserActiveTrue(household.id!!)
 
         for (member in members) {
+            // освободить задачи
+            taskService.releaseAssignedTasks(member.id!!)
+
             // обнулить баланс
-            member.balance = 0
+            transactionService.resetBalance(
+                BalanceResetTransactionCommand(
+                    householdId = household.id!!,
+                    memberId = member.id!!,
+                )
+            )
 
             // деактивировать связь
             member.isUserActive = false
 
-            // сохранить изменения - аналогично вроде не нужно
-//            userHouseholdRepository.save(member)
+            // сохранить изменения - транзакционный сервис, сохранять не нужно
+//            userHouseholdRepository.save(member) // managed entity
         }
 
         // деактивировать хозяйство
@@ -149,7 +163,9 @@ class HouseholdServiceImpl(
 
         // обновить название (обновляться может только оно) и сохранить
         household.name = newHousehold.name
-        return householdRepository.save(household).toDto()
+
+//        return householdRepository.save(household).toDto() // managed entity
+        return household.toDto()
     }
 
     override fun findHouseholdByInviteCode(inviteCode: String): HouseholdResponseDTO {

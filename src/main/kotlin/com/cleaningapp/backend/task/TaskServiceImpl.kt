@@ -10,6 +10,8 @@ import com.cleaningapp.backend.exception.UserNotActiveException
 import com.cleaningapp.backend.exception.UserNotFoundException
 import com.cleaningapp.backend.household.HouseholdEntity
 import com.cleaningapp.backend.household.HouseholdRepository
+import com.cleaningapp.backend.transaction.TaskCompletionTransactionCommand
+import com.cleaningapp.backend.transaction.TransactionService
 import com.cleaningapp.backend.user.UserEntity
 import com.cleaningapp.backend.user.UserRepository
 import com.cleaningapp.backend.userhousehold.UserHouseholdEntity
@@ -36,6 +38,8 @@ class TaskServiceImpl(
     private val userRepository: UserRepository,
     private val householdRepository: HouseholdRepository,
     private val userHouseholdRepository: UserHouseholdRepository,
+
+    private val transactionService: TransactionService,
 ): TaskService {
 
     // достать юзера из контекста
@@ -103,9 +107,8 @@ class TaskServiceImpl(
         // проверить состоит ли юзер в хозяйстве и активен ли в нем
         getActiveMembership(user.id!!, household.id!!)
 
-        // если id хозяйства
         // если такая задача уже есть - похуй может быть и вторая - сохраняем
-        return taskRepository.save(task.toTaskEntity(user, household)).toDto()
+        return taskRepository.save(task.toTaskEntity(user, household)).toDto() // сохранение оставить - новая сущность
     }
 
     // нельзя менять условия задачи если она взята в работу (забронена) или выполнена
@@ -139,7 +142,8 @@ class TaskServiceImpl(
         task.description = newTask.description
         task.reward = newTask.reward
 
-        return taskRepository.save(task).toDto()
+//        return taskRepository.save(task).toDto() // managed entity
+        return task.toDto()
     }
 
     // массовая сущность - если свободна то можно жестко удалить
@@ -192,7 +196,8 @@ class TaskServiceImpl(
         task.assignedTo = membership
         task.assignedAt = LocalDateTime.now()
 
-        return taskRepository.save(task).toDto()
+//        return taskRepository.save(task).toDto() // managed entity
+        return task.toDto()
     }
 
     // снять бронь с задачи может только тот кто ее забронировал
@@ -222,7 +227,8 @@ class TaskServiceImpl(
         task.assignedTo = null
         task.assignedAt = null
 
-        return taskRepository.save(task).toDto()
+//        return taskRepository.save(task).toDto() // managed entity
+        return task.toDto()
     }
 
     // задача должна быть забронирована чтобы ее завершить
@@ -259,12 +265,18 @@ class TaskServiceImpl(
         task.assignedTo = null
         task.assignedAt = null
 
-        // начисление капусты на баланс - через репозиторий
-        // (далее в сервисе UserHouseholdService не будет методов изменения баланса) - задача транзакций
-        membership.balance += task.reward
-        userHouseholdRepository.save(membership)
+        // начисление капусты на баланс - убрать сохранение
+//        val savedTask = taskRepository.save(task) // managed entity
 
-        return taskRepository.save(task).toDto()
+        transactionService.recordTaskCompletion(
+            TaskCompletionTransactionCommand(
+                householdId = task.household.id!!,
+                memberId = membership.id!!,
+                taskId = task.id!!,
+            )
+        )
+
+        return task.toDto()
     }
 
     @Transactional(readOnly = true)
@@ -329,6 +341,6 @@ class TaskServiceImpl(
         }
 
         // не возвращаем, просто сохраняем
-        taskRepository.saveAll(tasks)
+//        taskRepository.saveAll(tasks) // все managed entity - сохранять не нужно
     }
 }

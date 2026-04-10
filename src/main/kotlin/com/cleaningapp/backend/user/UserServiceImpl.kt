@@ -4,8 +4,9 @@ import com.cleaningapp.backend.exception.EmailAlreadyUsedException
 import com.cleaningapp.backend.exception.UserAlreadyExistsException
 import com.cleaningapp.backend.exception.UserNotActiveException
 import com.cleaningapp.backend.exception.UserNotFoundException
-import com.cleaningapp.backend.household.HouseholdRepository
 import com.cleaningapp.backend.task.TaskService
+import com.cleaningapp.backend.transaction.BalanceResetTransactionCommand
+import com.cleaningapp.backend.transaction.TransactionService
 import com.cleaningapp.backend.userhousehold.UserHouseholdRepository
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
@@ -16,9 +17,10 @@ import java.util.UUID
 @Transactional
 class UserServiceImpl(
     private val userRepository: UserRepository,
-    private val householdRepository: HouseholdRepository,
     private val userHouseholdRepository: UserHouseholdRepository,
+
     private val taskService: TaskService,
+    private val transactionService: TransactionService,
 ) : UserService {
 
     override fun createUser(firebaseUid: String, user: UserRegisterDTO): UserResponseDTO {
@@ -62,34 +64,35 @@ class UserServiceImpl(
             taskService.releaseAssignedTasks(userHousehold.id!!)
 
             // обнуляем баланс
-            userHousehold.balance = 0
+            transactionService.resetBalance(
+                BalanceResetTransactionCommand(
+                    householdId = userHousehold.household.id!!,
+                    memberId = userHousehold.id!!,
+                )
+            )
 
             // деактивируем пользователя
             userHousehold.isUserActive = false
 
-            // сохраняем изменения - вроде не нужно так как транзакционный сервис
-//            userHouseholdRepository.save(userHousehold) // не нужно?
+            // сохраняем изменения - транзакционный сервис, сохранять не обязательно
+//            userHouseholdRepository.save(userHousehold) // managed entity
 
             // проверяем остались ли еще активные участники в хозяйстве
             val household = userHousehold.household
-
-            // не нужно так как очищаю связи
-//            if (!household.isActive)
-//                throw RuntimeException("Household is not active")
 
             val activeMembers = userHouseholdRepository.countByHouseholdIdAndIsUserActiveTrue(household.id!!)
 
             // если нет больше активных участников то нужно деактивировать хозяйство
             if (activeMembers == 0) {
                 household.isActive = false
-//                householdRepository.save(household)
+//                householdRepository.save(household) // managed entity
             }
 
         }
 
         // деактивировать самого юзера и сохранить изменения
         user.isActive = false
-//        userRepository.save(user)
+//        userRepository.save(user) // managed entity
     }
 
     override fun updateProfile(firebaseUid: String, userNew: UserRegisterDTO): UserResponseDTO {
@@ -111,7 +114,8 @@ class UserServiceImpl(
         } else
             throw UserNotFoundException()
 
-        return userRepository.save(existingUser).toDTO()
+//        return userRepository.save(existingUser).toDTO() // managed entity
+        return existingUser.toDTO()
     }
 
     override fun findUserById(id: UUID): UserResponseDTO =

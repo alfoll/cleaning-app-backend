@@ -29,8 +29,8 @@ import java.util.UUID
 class PrivilegeEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "id", columnDefinition = "uuid", unique = true, nullable = false, updatable = false)
-    val id: UUID? = null, // JPA сам генерит id при сохранении в бд
+    @Column(name = "id", columnDefinition = "uuid", nullable = false, updatable = false)
+    var id: UUID? = null, // JPA сам генерит id при сохранении в бд
 
     @Column(name = "created_at", nullable = false, updatable = false)
     @CreationTimestamp

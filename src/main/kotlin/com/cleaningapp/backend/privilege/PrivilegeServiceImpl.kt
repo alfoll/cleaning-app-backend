@@ -10,6 +10,8 @@ import com.cleaningapp.backend.exception.UserNotActiveException
 import com.cleaningapp.backend.exception.UserNotFoundException
 import com.cleaningapp.backend.household.HouseholdEntity
 import com.cleaningapp.backend.household.HouseholdRepository
+import com.cleaningapp.backend.transaction.PrivilegePurchaseTransactionCommand
+import com.cleaningapp.backend.transaction.TransactionService
 import com.cleaningapp.backend.user.UserEntity
 import com.cleaningapp.backend.user.UserRepository
 import com.cleaningapp.backend.userhousehold.UserHouseholdEntity
@@ -34,7 +36,9 @@ class PrivilegeServiceImpl(
     private val userRepository: UserRepository,
     private val householdRepository: HouseholdRepository,
     private val userHouseholdRepository: UserHouseholdRepository,
-): PrivilegeService {
+
+    private val transactionService: TransactionService,
+    ): PrivilegeService {
 
     // достать юзера из контекста
     private fun getCurrentUser(): UserEntity {
@@ -132,7 +136,8 @@ class PrivilegeServiceImpl(
         privilege.description = newPrivilege.description
         privilege.cost = newPrivilege.cost
 
-        return privilegeRepository.save(privilege).toDto()
+//        return privilegeRepository.save(privilege).toDto() // managed entity
+        return privilege.toDto()
 
     }
 
@@ -177,16 +182,22 @@ class PrivilegeServiceImpl(
         if (membership.balance < privilege.cost)
             throw BusinessConflictException("You dont have enough coins to buy this privilege")
 
-        // списываем деньги с баланса - далее в транзакциях, сейчас через репозиторий
-        membership.balance -= privilege.cost
-
         // покупаем привилегию
         privilege.isAvailable = false
         privilege.boughtBy = membership
 
-        userHouseholdRepository.save(membership)
+        // списание средств с баланса
+//        val savedPrivilege = privilegeRepository.save(privilege) // managed entity
 
-        return privilegeRepository.save(privilege).toDto()
+        transactionService.recordPrivilegePurchase(
+            PrivilegePurchaseTransactionCommand(
+                householdId = privilege.household.id!!,
+                memberId = membership.id!!,
+                privilegeId = privilege.id!!,
+            )
+        )
+
+        return privilege.toDto()
     }
 
     @Transactional(readOnly = true)

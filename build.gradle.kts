@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     kotlin("jvm") version "2.2.21"
     kotlin("plugin.spring") version "2.2.21"
@@ -43,7 +45,8 @@ dependencies {
 // prod
     runtimeOnly("org.postgresql:postgresql")
 
-    implementation("org.springdoc:springdoc-openapi-ui:1.7.0") // API-контракт
+    // implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.x.x")
+    implementation("org.springdoc:springdoc-openapi-ui:1.7.0") // API-контракт]
 
 
     testImplementation("org.springframework.boot:spring-boot-starter-data-jpa-test")
@@ -57,9 +60,18 @@ dependencies {
 
 kotlin {
     compilerOptions {
-        freeCompilerArgs.addAll("-Xjsr305=strict", "-Xannotation-default-target=param-property")
+        jvmTarget.set(JvmTarget.JVM_21)
+        freeCompilerArgs.addAll(
+            "-Xjsr305=strict",
+            "-Xannotation-default-target=param-property"
+        )
     }
 }
+// kotlin {
+//     compilerOptions {
+//         freeCompilerArgs.addAll("-Xjsr305=strict", "-Xannotation-default-target=param-property")
+//     }
+// }
 
 allOpen {
     annotation("jakarta.persistence.Entity")

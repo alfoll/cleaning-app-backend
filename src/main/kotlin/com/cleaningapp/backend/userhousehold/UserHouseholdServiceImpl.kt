@@ -9,6 +9,8 @@ import com.cleaningapp.backend.exception.UserNotActiveException
 import com.cleaningapp.backend.exception.UserNotFoundException
 import com.cleaningapp.backend.household.HouseholdRepository
 import com.cleaningapp.backend.task.TaskService
+import com.cleaningapp.backend.transaction.BalanceResetTransactionCommand
+import com.cleaningapp.backend.transaction.TransactionService
 import com.cleaningapp.backend.user.UserEntity
 import com.cleaningapp.backend.user.UserRepository
 import com.cleaningapp.backend.user.UserResponseDTO
@@ -26,7 +28,9 @@ class UserHouseholdServiceImpl(
     private val userHouseholdRepository: UserHouseholdRepository,
     private val householdRepository: HouseholdRepository,
     private val userRepository: UserRepository,
+
     private val taskService: TaskService,
+    private val transactionService: TransactionService,
 ) : UserHouseholdService {
     // user и household при использовании в сервисах уже есть в бд, значит id точно не null -> можно использовать !!
 
@@ -76,7 +80,8 @@ class UserHouseholdServiceImpl(
         if (existing != null && !existing.isUserActive) {
             existing.isUserActive = true
             existing.balance = 0
-            return userHouseholdRepository.save(existing).toDto()
+//            return userHouseholdRepository.save(existing).toDto() // managed entity - вроде сохранение не нужно
+            return existing.toDto()
         }
 
         // создать связь и сохранить если пользователь новый
@@ -84,7 +89,7 @@ class UserHouseholdServiceImpl(
             this.user = user
             this.household = household
         }
-         return userHouseholdRepository.save(userHousehold).toDto()
+         return userHouseholdRepository.save(userHousehold).toDto() // сохраняется новая сущность
     }
 
     override fun leaveHousehold(householdId: UUID) {
@@ -111,11 +116,16 @@ class UserHouseholdServiceImpl(
         taskService.releaseAssignedTasks(userHousehold.id!!)
 
         // обнулить баланс
-        userHousehold.balance = 0
+        transactionService.resetBalance(
+            BalanceResetTransactionCommand(
+                householdId = household.id!!,
+                memberId = userHousehold.id!!,
+            )
+        )
 
         // деактивировать в хозяйстве и сохранить изменения
         userHousehold.isUserActive = false
-        userHouseholdRepository.save(userHousehold)
+//        userHouseholdRepository.save(userHousehold) // managed entity
 
         // если это был последний участник хозяйства - деактивировать хозяйство хозяйства
         val activeMembers = userHouseholdRepository.countByHouseholdIdAndIsUserActiveTrue(household.id!!)
@@ -124,7 +134,7 @@ class UserHouseholdServiceImpl(
         // -> нет смысла вызывать меод из сервиса
         if (activeMembers == 0) {
             household.isActive = false
-            householdRepository.save(household)
+//            householdRepository.save(household) // managed entity
         }
     }
 
@@ -166,18 +176,23 @@ class UserHouseholdServiceImpl(
         taskService.releaseAssignedTasks(removedUser.id!!)
 
         // обнулить баланс УДАЛЯЕМОГО ЮЗЕРА в хозяйстве
-        removedUser.balance = 0
+        transactionService.resetBalance(
+            BalanceResetTransactionCommand(
+                householdId = household.id!!,
+                memberId = removedUser.id!!,
+            )
+        )
 
         // деактивировать и сохранить изменения
         removedUser.isUserActive = false
-        userHouseholdRepository.save(removedUser)
+//        userHouseholdRepository.save(removedUser) // managed entity
 
         // на всякий случай проверить, остались ли еще участники (НЕ УВЕРЕНА НУЖНО ЛИ) - удалить потом мб
         val activeMembers = userHouseholdRepository.countByHouseholdIdAndIsUserActiveTrue(household.id!!)
 
         if (activeMembers == 0) {
             household.isActive = false
-            householdRepository.save(household)
+//            householdRepository.save(household) // managed entity
         }
     }
 
@@ -220,66 +235,4 @@ class UserHouseholdServiceImpl(
             .map { it.user.toDTO() }
 
     }
-
-//    // в транзакции, тут не нужны
-//    override fun increaseBalance(householdId: UUID, amount: Int): UserHouseholdResponseDTO {
-//        // amount должен быть больше 0
-//        if (amount <= 0)
-//            throw BusinessConflictException("Amount must be greater than 0")
-//
-//        // сущтвует ли хозяйство
-//        val household = householdRepository.findByIdOrNull(householdId)
-//            ?: throw HouseholdNotFoundException()
-//
-//        // активно ли хозяйство
-//        if (!household.isActive)
-//            throw HouseholdNotActiveException()
-//
-//        // есть ли юзер в хозяйстве
-//        val user = getCurrentUser()
-//
-//        val userHousehold = userHouseholdRepository.findByUserIdAndHouseholdId(user.id!!, household.id!!)
-//            ?: throw MembershipNotFoundException()
-//
-//        // активен ли юзер в хозяйстве
-//        if (!userHousehold.isUserActive)
-//            throw MembershipNotActiveException()
-//
-//        // пополнить баланс   сохранить заново
-//        userHousehold.balance += amount
-//        return userHouseholdRepository.save(userHousehold).toDto()
-//    }
-//
-//    // в транзакции, тут не нужны
-//    override fun decreaseBalance(householdId: UUID, amount: Int): UserHouseholdResponseDTO {
-//        // amount должен быть больше 0
-//        if (amount <= 0)
-//            throw BusinessConflictException("Amount must be greater than 0")
-//
-//        // сущтвует ли хозяйство
-//        val household = householdRepository.findByIdOrNull(householdId)
-//            ?: throw HouseholdNotFoundException()
-//
-//        // активно ли хозяйство
-//        if (!household.isActive)
-//            throw HouseholdNotActiveException()
-//
-//        // есть ли юзер в хозяйстве
-//        val user = getCurrentUser()
-//
-//        val userHousehold = userHouseholdRepository.findByUserIdAndHouseholdId(user.id!!, household.id!!)
-//            ?: throw MembershipNotFoundException()
-//
-//        // активен ли юзер в хозяйстве
-//        if (!userHousehold.isUserActive)
-//            throw MembershipNotActiveException()
-//
-//        // баланс должен оставаться положительным
-//        if (userHousehold.balance < amount)
-//            throw BusinessConflictException("Balance must be greater (or equal) than amount")
-//
-//        // обновить баланс и сохранить
-//        userHousehold.balance -= amount
-//        return userHouseholdRepository.save(userHousehold).toDto()
-//    }
 }

@@ -132,11 +132,18 @@ class GlobalExceptionHandler {
         return ExcResponse("400 MALFORMED_REQUEST", "Request body is invalid or malformed")
     }
 
-    // остальной рандом
+    // некоррекнтые аргументы от пользователя
+    @ExceptionHandler(IllegalArgumentException::class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST) // 400
+    fun handleIllegalArgumentException(e: IllegalArgumentException): ExcResponse {
+        return ExcResponse("400 ILLEGAL_ARGUMENT", e.message)
+    }
+
+    // остальной рандом (IllegalStateException сюда)
     @ExceptionHandler(Exception::class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR) // 500
     fun handleException(e: Exception): ExcResponse {
         e.printStackTrace() // стектрейс
-        return ExcResponse("500 INTERNAL_SERVER_ERROR", e.message)
+        return ExcResponse("500 INTERNAL_SERVER_ERROR", "Unexpected server error")
     }
 }
