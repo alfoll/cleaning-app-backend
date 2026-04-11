@@ -1,17 +1,13 @@
-package com.cleaningapp.backend.transaction
+package com.cleaningapp.backend.activity
 
-// маппер для создания не нужен, так как транзакция не создается извне - только как внутренняя операция
-fun TransactionEntity.toDto(): TransactionResponseDTO = TransactionResponseDTO(
+fun ActivityEntity.toDto(): ActivityResponseDTO = ActivityResponseDTO(
     id = id!!, // когда используется маппер id уже гарантированно не null (null только до сохранения в бд)
 
     householdId = household.id!!, // когда используется маппер id уже гарантированно не null (null только до сохранения в бд)
     userId = member.user.id!!, // наружу передаю User.id а не id участия
 
-    amount = amount,
-    type = type,
+    activityType = activityType,
     createdAt = createdAt,
-
-    // что то одно будет заполнено, второе null
-    taskId = task?.id,
-    privilegeId = privilege?.id,
+    title = title,
+    description = description,
 )
