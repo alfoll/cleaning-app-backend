@@ -1,5 +1,8 @@
 package com.cleaningapp.backend.household
 
+import com.cleaningapp.backend.activity.ActivityService
+import com.cleaningapp.backend.activity.ActivityType
+import com.cleaningapp.backend.activity.RecordActivityCommand
 import com.cleaningapp.backend.exception.BusinessConflictException
 import com.cleaningapp.backend.exception.HouseholdNotActiveException
 import com.cleaningapp.backend.exception.HouseholdNotFoundException
@@ -30,6 +33,7 @@ class HouseholdServiceImpl(
 
     private val taskService: TaskService,
     private val transactionService: TransactionService,
+    private val activityService: ActivityService,
 ) : HouseholdService {
 
     // генерация кода из символов
@@ -88,7 +92,18 @@ class HouseholdServiceImpl(
                 this.user = user
                 this.household = householdEntity
             }
-        userHouseholdRepository.save(userHousehold)
+        val savedUserHousehold = userHouseholdRepository.save(userHousehold)
+
+        // создаем запись HOUSEHOLD_CREATED в ленте активности
+        activityService.createActivityRecord(
+            RecordActivityCommand(
+                householdId = saved.id!!,
+                memberId = savedUserHousehold.id!!,
+                activityType = ActivityType.HOUSEHOLD_CREATED,
+                title = "Household Created",
+                description = "Household \"${saved.name}\" was created"
+            )
+        )
 
         return saved.toDto()
     }

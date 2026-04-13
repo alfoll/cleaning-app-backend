@@ -1,5 +1,8 @@
 package com.cleaningapp.backend.privilege
 
+import com.cleaningapp.backend.activity.ActivityService
+import com.cleaningapp.backend.activity.ActivityType
+import com.cleaningapp.backend.activity.RecordActivityCommand
 import com.cleaningapp.backend.exception.BusinessConflictException
 import com.cleaningapp.backend.exception.HouseholdNotActiveException
 import com.cleaningapp.backend.exception.HouseholdNotFoundException
@@ -38,6 +41,7 @@ class PrivilegeServiceImpl(
     private val userHouseholdRepository: UserHouseholdRepository,
 
     private val transactionService: TransactionService,
+    private val activityService: ActivityService,
     ): PrivilegeService {
 
     // достать юзера из контекста
@@ -105,10 +109,23 @@ class PrivilegeServiceImpl(
         val household = getActiveHousehold(householdId)
 
         // достать активное участие
-        getActiveMembership(user.id!!, household.id!!)
+        val membership = getActiveMembership(user.id!!, household.id!!)
 
-        // если такая привилегия уже есть - без разницы, оставляет (дубли не страшны)
-        return privilegeRepository.save(privilege.toPrivilegeEntity(household, user)).toDto()
+        // сохраняем привилегию
+        val savedPrivilege = privilegeRepository.save(privilege.toPrivilegeEntity(household, user))
+
+        // создаем запись PRIVILEGE_CREATED в ленте активности
+        activityService.createActivityRecord(
+            RecordActivityCommand(
+                householdId = household.id!!,
+                memberId = membership.id!!,
+                activityType = ActivityType.PRIVILEGE_CREATED,
+                title = "Privilege created",
+                description = "${user.name} created privilege \"${savedPrivilege.title}\""
+            )
+        )
+
+        return savedPrivilege.toDto()
     }
 
     // можно менять только не купленные привилегии
@@ -194,6 +211,17 @@ class PrivilegeServiceImpl(
                 householdId = privilege.household.id!!,
                 memberId = membership.id!!,
                 privilegeId = privilege.id!!,
+            )
+        )
+
+        // создаем запись PRIVILEGE_BOUGHT в ленте активности
+        activityService.createActivityRecord(
+            RecordActivityCommand(
+                householdId = privilege.household.id!!,
+                memberId = membership.id!!,
+                activityType = ActivityType.PRIVILEGE_BOUGHT,
+                title = "Privilege bought",
+                description = "${user.name} bought privilege \"${privilege.title}\""
             )
         )
 

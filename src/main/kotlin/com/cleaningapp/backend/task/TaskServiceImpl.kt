@@ -1,5 +1,8 @@
 package com.cleaningapp.backend.task
 
+import com.cleaningapp.backend.activity.ActivityService
+import com.cleaningapp.backend.activity.ActivityType
+import com.cleaningapp.backend.activity.RecordActivityCommand
 import com.cleaningapp.backend.exception.BusinessConflictException
 import com.cleaningapp.backend.exception.HouseholdNotActiveException
 import com.cleaningapp.backend.exception.HouseholdNotFoundException
@@ -40,6 +43,7 @@ class TaskServiceImpl(
     private val userHouseholdRepository: UserHouseholdRepository,
 
     private val transactionService: TransactionService,
+    private val activityService: ActivityService,
 ): TaskService {
 
     // достать юзера из контекста
@@ -100,15 +104,28 @@ class TaskServiceImpl(
 
     // создать задачу может любой активный участник хозяйсвта
     override fun createTask(householdId: UUID, task: TaskRegisterDTO): TaskResponseDTO {
-        // достать юзера и активное хозяйства
+        // достать юзера и активное хозяйство
         val user = getCurrentUser()
         val household = getActiveHousehold(householdId)
 
-        // проверить состоит ли юзер в хозяйстве и активен ли в нем
-        getActiveMembership(user.id!!, household.id!!)
+        // проверить состоит ли юзер в хозяйстве и активен ли в нем + для ленты активности
+        val membership = getActiveMembership(user.id!!, household.id!!)
 
-        // если такая задача уже есть - похуй может быть и вторая - сохраняем
-        return taskRepository.save(task.toTaskEntity(user, household)).toDto() // сохранение оставить - новая сущность
+        // сохраняем задачу
+        val savedTask = taskRepository.save(task.toTaskEntity(user, household))
+
+        // запись TASK_CREATED в ленту активности
+        activityService.createActivityRecord(
+            RecordActivityCommand(
+                householdId = household.id!!,
+                memberId = membership.id!!,
+                activityType = ActivityType.TASK_CREATED,
+                title = "Task created",
+                description = "${user.name} created task \"${savedTask.title}\""
+            )
+        )
+
+        return savedTask.toDto() // сохранение оставить - новая сущность
     }
 
     // нельзя менять условия задачи если она взята в работу (забронена) или выполнена
@@ -192,9 +209,20 @@ class TaskServiceImpl(
         if (task.assignedTo != null)
             throw BusinessConflictException("Assigned task cannot be assigned")
 
-        // бронируемза собой
+        // бронируем за собой
         task.assignedTo = membership
         task.assignedAt = LocalDateTime.now()
+
+        // создаем запись TASK_ASSIGNED в ленте активности
+        activityService.createActivityRecord(
+            RecordActivityCommand(
+                householdId = task.household.id!!,
+                memberId = membership.id!!,
+                activityType = ActivityType.TASK_ASSIGNED,
+                title = "Task assigned",
+                description = "${user.name} assigned task \"${task.title}\""
+            )
+        )
 
 //        return taskRepository.save(task).toDto() // managed entity
         return task.toDto()
@@ -226,6 +254,17 @@ class TaskServiceImpl(
         // освобождаем + сохраняем
         task.assignedTo = null
         task.assignedAt = null
+
+        // создаем запись TASK_UNASSIGNED в ленте активности
+        activityService.createActivityRecord(
+            RecordActivityCommand(
+                householdId = task.household.id!!,
+                memberId = membership.id!!,
+                activityType = ActivityType.TASK_UNASSIGNED,
+                title = "Task unassigned",
+                description = "${user.name} unassigned task \"${task.title}\""
+            )
+        )
 
 //        return taskRepository.save(task).toDto() // managed entity
         return task.toDto()
@@ -273,6 +312,17 @@ class TaskServiceImpl(
                 householdId = task.household.id!!,
                 memberId = membership.id!!,
                 taskId = task.id!!,
+            )
+        )
+
+        // создаем запись TASK_COMPLETED в ленте активности
+        activityService.createActivityRecord(
+            RecordActivityCommand(
+                householdId = task.household.id!!,
+                memberId = membership.id!!,
+                activityType = ActivityType.TASK_COMPLETED,
+                title = "Task completed",
+                description = "${user.name} completed task \"${task.title}\""
             )
         )
 

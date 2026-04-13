@@ -1,5 +1,8 @@
 package com.cleaningapp.backend.userhousehold
 
+import com.cleaningapp.backend.activity.ActivityService
+import com.cleaningapp.backend.activity.ActivityType
+import com.cleaningapp.backend.activity.RecordActivityCommand
 import com.cleaningapp.backend.exception.BusinessConflictException
 import com.cleaningapp.backend.exception.HouseholdNotActiveException
 import com.cleaningapp.backend.exception.HouseholdNotFoundException
@@ -31,6 +34,7 @@ class UserHouseholdServiceImpl(
 
     private val taskService: TaskService,
     private val transactionService: TransactionService,
+    private val activityService: ActivityService,
 ) : UserHouseholdService {
     // user и household при использовании в сервисах уже есть в бд, значит id точно не null -> можно использовать !!
 
@@ -80,6 +84,18 @@ class UserHouseholdServiceImpl(
         if (existing != null && !existing.isUserActive) {
             existing.isUserActive = true
             existing.balance = 0
+
+            // создаем запись USER_JOINED в ленте активности - возвращение юзера
+            activityService.createActivityRecord(
+                RecordActivityCommand(
+                    householdId = household.id!!,
+                    memberId = existing.id!!,
+                    activityType = ActivityType.USER_JOINED,
+                    title = "User joined",
+                    description = "${user.name} rejoined household \"${household.name}\""
+                )
+            )
+
 //            return userHouseholdRepository.save(existing).toDto() // managed entity - вроде сохранение не нужно
             return existing.toDto()
         }
@@ -89,7 +105,20 @@ class UserHouseholdServiceImpl(
             this.user = user
             this.household = household
         }
-         return userHouseholdRepository.save(userHousehold).toDto() // сохраняется новая сущность
+        val savedUserHousehold = userHouseholdRepository.save(userHousehold)
+
+        // создаем запись USER_JOINED в ленте активности - новое присоединение
+        activityService.createActivityRecord(
+            RecordActivityCommand(
+                householdId = household.id!!,
+                memberId = savedUserHousehold.id!!,
+                activityType = ActivityType.USER_JOINED,
+                title = "User joined",
+                description = "${user.name} joined household \"${household.name}\""
+            )
+        )
+
+        return savedUserHousehold.toDto() // сохраняется новая сущность
     }
 
     override fun leaveHousehold(householdId: UUID) {
@@ -127,11 +156,22 @@ class UserHouseholdServiceImpl(
         userHousehold.isUserActive = false
 //        userHouseholdRepository.save(userHousehold) // managed entity
 
+        // создать запись USER_LEFT в ленте активности
+        activityService.createActivityRecord(
+            RecordActivityCommand(
+                householdId = household.id!!,
+                memberId = userHousehold.id!!,
+                activityType = ActivityType.USER_LEFT,
+                title = "User left",
+                description = "${user.name} left household \"${household.name}\""
+            )
+        )
+
         // если это был последний участник хозяйства - деактивировать хозяйство хозяйства
         val activeMembers = userHouseholdRepository.countByHouseholdIdAndIsUserActiveTrue(household.id!!)
 
         // так как участников больше нет, а проверки все те же что и в deleteHousehold в HouseholdService
-        // -> нет смысла вызывать меод из сервиса
+        // -> нет смысла вызывать метод из сервиса
         if (activeMembers == 0) {
             household.isActive = false
 //            householdRepository.save(household) // managed entity
@@ -187,13 +227,24 @@ class UserHouseholdServiceImpl(
         removedUser.isUserActive = false
 //        userHouseholdRepository.save(removedUser) // managed entity
 
-        // на всякий случай проверить, остались ли еще участники (НЕ УВЕРЕНА НУЖНО ЛИ) - удалить потом мб
-        val activeMembers = userHouseholdRepository.countByHouseholdIdAndIsUserActiveTrue(household.id!!)
+        // создать запись USER_REMOVED в ленте активности
+        activityService.createActivityRecord(
+            RecordActivityCommand(
+                householdId = household.id!!,
+                memberId = userHousehold.id!!, // действие совершено УДАЛЯЮЩИМ
+                activityType = ActivityType.USER_REMOVED,
+                title = "User removed",
+                description = "${removedUser.user.name} was removed from household \"${household.name}\" by user ${user.name}"
+            )
+        )
 
-        if (activeMembers == 0) {
-            household.isActive = false
-//            householdRepository.save(household) // managed entity
-        }
+//        // МЕРТВАЯ ВЕТКА - на всякий случай проверить, остались ли еще участники
+//        val activeMembers = userHouseholdRepository.countByHouseholdIdAndIsUserActiveTrue(household.id!!)
+//
+//        if (activeMembers == 0) {
+//            household.isActive = false
+////            householdRepository.save(household) // managed entity
+//        }
     }
 
     @Transactional(readOnly = true)

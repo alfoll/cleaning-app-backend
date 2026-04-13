@@ -1,5 +1,8 @@
 package com.cleaningapp.backend.user
 
+import com.cleaningapp.backend.activity.ActivityService
+import com.cleaningapp.backend.activity.ActivityType
+import com.cleaningapp.backend.activity.RecordActivityCommand
 import com.cleaningapp.backend.exception.EmailAlreadyUsedException
 import com.cleaningapp.backend.exception.UserAlreadyExistsException
 import com.cleaningapp.backend.exception.UserNotActiveException
@@ -21,6 +24,7 @@ class UserServiceImpl(
 
     private val taskService: TaskService,
     private val transactionService: TransactionService,
+    private val activityService: ActivityService,
 ) : UserService {
 
     override fun createUser(firebaseUid: String, user: UserRegisterDTO): UserResponseDTO {
@@ -76,6 +80,17 @@ class UserServiceImpl(
 
             // сохраняем изменения - транзакционный сервис, сохранять не обязательно
 //            userHouseholdRepository.save(userHousehold) // managed entity
+
+            // для каждого хозяйства запись в ленте активности USER_LEFT
+            activityService.createActivityRecord(
+                RecordActivityCommand(
+                    householdId = userHousehold.household.id!!,
+                    memberId = userHousehold.id!!,
+                    activityType = ActivityType.USER_LEFT,
+                    title = "User left",
+                    description = "${user.name} left household \"${userHousehold.household.name}\""
+                )
+            )
 
             // проверяем остались ли еще активные участники в хозяйстве
             val household = userHousehold.household
