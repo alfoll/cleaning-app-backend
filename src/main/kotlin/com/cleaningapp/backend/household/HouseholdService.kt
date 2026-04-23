@@ -8,7 +8,7 @@ interface HouseholdService {
 
     fun updateHousehold(householdId: UUID, newHousehold: HouseholdRegisterDTO): HouseholdResponseDTO
 
-    fun findHouseholdById(id: UUID): HouseholdResponseDTO
+    fun findHouseholdById(householdId: UUID): HouseholdResponseDTO
     fun findHouseholdByInviteCode(inviteCode: String): HouseholdResponseDTO
 
 }

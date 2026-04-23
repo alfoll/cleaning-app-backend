@@ -6,6 +6,7 @@ import java.util.UUID
 interface UserHouseholdRepository : JpaRepository<UserHouseholdEntity, UUID> {
     // найти связь по id юзера и хозяйства
     fun findByUserIdAndHouseholdId(userId: UUID, householdId: UUID): UserHouseholdEntity?
+    fun findAllByHouseholdId(householdId: UUID): List<UserHouseholdEntity>
 
     // найти/посчитать активных юзеров хозяйства (активные связи)
     fun countByHouseholdIdAndIsUserActiveTrue(householdId: UUID): Int

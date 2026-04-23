@@ -1,6 +1,9 @@
 package com.cleaningapp.backend.activity
 
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Modifying
+import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
 import java.util.UUID
 
 interface ActivityRepository: JpaRepository<ActivityEntity, UUID> {
@@ -20,4 +23,9 @@ interface ActivityRepository: JpaRepository<ActivityEntity, UUID> {
         activityType: ActivityType,
         memberId: UUID,
     ): List<ActivityEntity>
+
+    // bulk delete
+    @Modifying(flushAutomatically = true, clearAutomatically = false)
+    @Query("delete from ActivityEntity a where a.household.id = :householdId")
+    fun deleteAllByHouseholdId(@Param("householdId") householdId: UUID): Int
 }
