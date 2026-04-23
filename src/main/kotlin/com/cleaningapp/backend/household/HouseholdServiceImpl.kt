@@ -105,6 +105,17 @@ class HouseholdServiceImpl(
             )
         )
 
+        // создаем запись USER_JOINED в ленте активности - юзер сразу присоединяется к созданному хозяйству
+        activityService.createActivityRecord(
+            RecordActivityCommand(
+                householdId = saved.id!!,
+                memberId = savedUserHousehold.id!!,
+                activityType = ActivityType.USER_JOINED,
+                title = "User joined",
+                description = "${user.name} joined household \"${saved.name}\""
+            )
+        )
+
         return saved.toDto()
     }
 

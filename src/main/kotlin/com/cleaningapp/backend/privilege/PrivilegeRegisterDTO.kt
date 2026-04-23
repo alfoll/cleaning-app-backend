@@ -16,6 +16,6 @@ data class PrivilegeRegisterDTO(
 
     // разобраться с границами cost
     @field:Min(5, message = "Cost must be at least 5")
-    @field:Max(100, message = "Cost must be at most 100")
+    @field:Max(500, message = "Cost must be at most 500")
     val cost: Int // можно менять до покупки но в дто это не нужно - стоит ли?
 )

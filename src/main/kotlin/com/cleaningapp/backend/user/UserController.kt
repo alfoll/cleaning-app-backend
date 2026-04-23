@@ -23,10 +23,17 @@ class UserController(
     fun getProfile(@AuthenticationPrincipal userDetails: UserDetails): UserResponseDTO =
         userService.findUserByFirebaseUid(userDetails.username)
 
+    // обновление профиля не включает смену почты
     @PutMapping("/me")
     fun updateProfile(@AuthenticationPrincipal userDetails: UserDetails,
-                      @Valid @RequestBody newUser: UserRegisterDTO): UserResponseDTO =
+                      @Valid @RequestBody newUser: UserUpdateDTO): UserResponseDTO =
         userService.updateProfile(userDetails.username, newUser)
+
+    // обновление почты - отдельный сценарий
+    // запрос на синхронизацию почты в локальной бд после смены ее на Firebase Auth портале
+    @PutMapping("/me/email/sync")
+    fun syncEmailFromFirebase(@AuthenticationPrincipal userDetails: UserDetails): UserResponseDTO =
+        userService.syncEmailFromFirebase(userDetails.username)
 
     @DeleteMapping("/me")
     @ResponseStatus(HttpStatus.NO_CONTENT)

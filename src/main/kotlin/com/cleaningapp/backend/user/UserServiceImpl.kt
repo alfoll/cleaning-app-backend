@@ -7,6 +7,7 @@ import com.cleaningapp.backend.exception.EmailAlreadyUsedException
 import com.cleaningapp.backend.exception.UserAlreadyExistsException
 import com.cleaningapp.backend.exception.UserNotActiveException
 import com.cleaningapp.backend.exception.UserNotFoundException
+import com.cleaningapp.backend.security.FirebaseAuthService
 import com.cleaningapp.backend.task.TaskService
 import com.cleaningapp.backend.transaction.BalanceResetTransactionCommand
 import com.cleaningapp.backend.transaction.TransactionService
@@ -25,6 +26,7 @@ class UserServiceImpl(
     private val taskService: TaskService,
     private val transactionService: TransactionService,
     private val activityService: ActivityService,
+    private val firebaseAuthService: FirebaseAuthService,
 ) : UserService {
 
     override fun createUser(firebaseUid: String, user: UserRegisterDTO): UserResponseDTO {
@@ -110,24 +112,19 @@ class UserServiceImpl(
 //        userRepository.save(user) // managed entity
     }
 
-    override fun updateProfile(firebaseUid: String, userNew: UserRegisterDTO): UserResponseDTO {
+    // update профиля не включает смену почты - она через fb отдельным сценарием
+    override fun updateProfile(firebaseUid: String, userNew: UserUpdateDTO): UserResponseDTO {
+        // найти юзера
         val existingUser = userRepository.findUserByFirebaseUid(firebaseUid)
-        // есть ли вообще юзер
-        if (existingUser != null) {
-            // меняется ли почта
-            if (existingUser.email != userNew.email) {
-                val userWithEmail = userRepository.findUserByEmail(userNew.email)
-                // если такая почта уже существует - ее нельзя поставить
-                if (userWithEmail != null && userWithEmail.id != existingUser.id) {
-                    throw EmailAlreadyUsedException()
-                }
-            }
-            // меняем остальное
-            existingUser.name = userNew.name
-            existingUser.email = userNew.email
-            existingUser.avatarUrl = userNew.avatarUrl
-        } else
-            throw UserNotFoundException()
+            ?: throw UserNotFoundException()
+
+        // проверка активен ли юзер
+        if (!existingUser.isActive)
+            throw UserNotActiveException()
+
+        // меняем поля (имя + аватар - без почты)
+        existingUser.name = userNew.name
+        existingUser.avatarUrl = userNew.avatarUrl
 
 //        return userRepository.save(existingUser).toDTO() // managed entity
         return existingUser.toDTO()
@@ -144,4 +141,36 @@ class UserServiceImpl(
     override fun findUserByFirebaseUid(firebaseUid: String): UserResponseDTO =
         userRepository.findUserByFirebaseUid(firebaseUid)?.toDTO()
             ?: throw UserNotFoundException()
+
+
+    // отдельный сценарий смены почты через fb подразумевает синхронизацию с локальной бд
+    override fun syncEmailFromFirebase(firebaseUid: String): UserResponseDTO {
+        // найти существующего юзера (firebaseUid из уже валидированного токена)
+        val existingUser = userRepository.findUserByFirebaseUid(firebaseUid)
+            ?: throw UserNotFoundException()
+
+        // проверить активность
+        if (!existingUser.isActive)
+            throw UserNotActiveException()
+
+        // достать пользователя из FB по uid
+        val firebaseUser = firebaseAuthService.detUserByUid(firebaseUid)
+
+        // взять почту (FB)
+        val firebaseEmail = firebaseUser.email
+            ?: throw IllegalStateException("Firebase user has no email")
+
+        // если почта действительно изменена (не совпадает со старой) - если совпадает то просто возвращаем того же юзера
+        if (existingUser.email != firebaseEmail) {
+            // проверить не занята ли уже новая почта кем то ДРУГИМ
+            val sameEmail = userRepository.findUserByEmail(firebaseEmail)
+            if (sameEmail != null && sameEmail.id != existingUser.id)
+                throw EmailAlreadyUsedException()
+
+            // сменить почту в локальной бд
+            existingUser.email = firebaseEmail
+        }
+
+        return existingUser.toDTO() // managed entity
+    }
 }
