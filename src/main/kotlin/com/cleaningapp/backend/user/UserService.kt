@@ -1,19 +1,16 @@
 package com.cleaningapp.backend.user
 
-import java.util.UUID
 
 interface UserService {
     fun createUser(firebaseUid: String, user: UserRegisterDTO): UserResponseDTO
-    fun deleteUser(firebaseUid: String)
+    fun deleteUser()
 
     // обновление не включает смену почты
-    fun updateProfile(firebaseUid: String, userNew: UserUpdateDTO): UserResponseDTO
+    fun updateProfile(userNew: UserUpdateDTO): UserResponseDTO
+    fun getProfile(): UserResponseDTO
 
     // мена почты - отдельный сценарий, происходит через fb
     // синхронизация email из firebase с локальной бд (после смены email на fb)
-    fun syncEmailFromFirebase(firebaseUid: String): UserResponseDTO
+    fun syncEmailFromFirebase(): UserResponseDTO
 
-    fun findUserById(id: UUID): UserResponseDTO
-    fun findUserByEmail(email: String): UserResponseDTO
-    fun findUserByFirebaseUid(firebaseUid: String): UserResponseDTO
 }

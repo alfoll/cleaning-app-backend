@@ -2,8 +2,6 @@ package com.cleaningapp.backend.user
 
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
-import org.springframework.security.core.annotation.AuthenticationPrincipal
-import org.springframework.security.core.userdetails.UserDetails
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PutMapping
@@ -20,25 +18,24 @@ class UserController(
     @GetMapping("/me")
     // firebase uid достается из контекста из UserDetails (username)
     // (idToken от fb проверяется на валидность в фильтре на каждый эндпойнт -> uid в UserDetails как username)
-    fun getProfile(@AuthenticationPrincipal userDetails: UserDetails): UserResponseDTO =
-        userService.findUserByFirebaseUid(userDetails.username)
+    fun getProfile(): UserResponseDTO =
+        userService.getProfile()
 
     // обновление профиля не включает смену почты
     @PutMapping("/me")
-    fun updateProfile(@AuthenticationPrincipal userDetails: UserDetails,
-                      @Valid @RequestBody newUser: UserUpdateDTO): UserResponseDTO =
-        userService.updateProfile(userDetails.username, newUser)
+    fun updateProfile(@Valid @RequestBody newUser: UserUpdateDTO): UserResponseDTO =
+        userService.updateProfile(newUser)
 
     // обновление почты - отдельный сценарий
     // запрос на синхронизацию почты в локальной бд после смены ее на Firebase Auth портале
     @PutMapping("/me/email/sync")
-    fun syncEmailFromFirebase(@AuthenticationPrincipal userDetails: UserDetails): UserResponseDTO =
-        userService.syncEmailFromFirebase(userDetails.username)
+    fun syncEmailFromFirebase(): UserResponseDTO =
+        userService.syncEmailFromFirebase()
 
     @DeleteMapping("/me")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun deleteProfile(@AuthenticationPrincipal userDetails: UserDetails) =
-        userService.deleteUser(userDetails.username)
+    fun deleteProfile() =
+        userService.deleteUser()
 
     // хозяйства пользователя можно взять через UserHouseholdController
 }
