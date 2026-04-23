@@ -59,12 +59,20 @@ class FirebaseAuthFilter (
                     .build()
             } else {
                 // для всех остальных запросов проверяем наличие пользователя в БД
-                val dbUser = userRepository.findUserByFirebaseUid(firebaseUid)?.toUserDetails() // маппим в UserDetails в любом случае
+                val dbUser = userRepository.findUserByFirebaseUid(firebaseUid)
                     ?: run {
                         response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "User not found")
                         return
                     }
-                dbUser
+                // проверка на активность юзера уже на этапе фильтра, далее в сервисах тоже есть
+                if (!dbUser.isActive) {
+                    SecurityContextHolder.clearContext()
+                    response.status = HttpServletResponse.SC_FORBIDDEN
+                    response.contentType = "application/json"
+                    response.writer.write("""{"error":"User account is deactivated"}""")
+                    return
+                }
+                dbUser.toUserDetails()
             }
 
             // в principal поле кладем объект UserDetails -> его в контекст
