@@ -25,5 +25,5 @@ interface TaskService {
     fun getHouseholdTasks(householdId: UUID, filter: TaskFilterType): List<TaskResponseDTO> // сделать с фильтром?
 
     // освободить забронированные пользователем задачи (при выходе/удалении)
-    fun releaseAssignedTasks(userHouseholdId: UUID)
+    fun releaseAssignedTasks(userHouseholdId: UUID): Int
 }

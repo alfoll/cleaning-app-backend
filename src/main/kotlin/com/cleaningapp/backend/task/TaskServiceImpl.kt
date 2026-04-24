@@ -380,7 +380,7 @@ class TaskServiceImpl(
 
     // для UserHouseholdService - при удалении/выходе пользователя - через участие
     // для UserService - приудалении пользователя из системы - через участие
-    override fun releaseAssignedTasks(userHouseholdId: UUID) {
+    override fun releaseAssignedTasks(userHouseholdId: UUID): Int {
         // достали все незавершенные задачи участника
         val tasks = taskRepository.findAllByAssignedToIdAndIsCompletedFalse(userHouseholdId)
 
@@ -392,5 +392,8 @@ class TaskServiceImpl(
 
         // не возвращаем, просто сохраняем
 //        taskRepository.saveAll(tasks) // все managed entity - сохранять не нужно
+
+        // возвращаем количество освобожденных задач
+        return tasks.size
     }
 }

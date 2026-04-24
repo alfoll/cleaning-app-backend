@@ -170,7 +170,7 @@ class UserHouseholdServiceImpl(
         }
 
         // освободить забронированные задачи
-        taskService.releaseAssignedTasks(userHousehold.id!!)
+        val releasedTaskAmount = taskService.releaseAssignedTasks(userHousehold.id!!)
 
         // обнулить баланс
         transactionService.resetBalance(
@@ -180,18 +180,25 @@ class UserHouseholdServiceImpl(
             )
         )
 
+
         // деактивировать участие и сохранить изменения
         userHousehold.isUserActive = false
 //        userHouseholdRepository.save(userHousehold) // managed entity
 
         // создать запись USER_LEFT в ленте активности
+        val description = if (releasedTaskAmount > 0) {
+            "${user.name} left household \"${household.name}\". " +
+                    "$releasedTaskAmount tasks were released"
+        } else {
+            "${user.name} left household \"${household.name}\""
+        }
         activityService.createActivityRecord(
             RecordActivityCommand(
                 householdId = household.id!!,
                 memberId = userHousehold.id!!,
                 activityType = ActivityType.USER_LEFT,
                 title = "User left",
-                description = "${user.name} left household \"${household.name}\""
+                description = description
             )
         )
     }
@@ -231,7 +238,7 @@ class UserHouseholdServiceImpl(
             throw BusinessConflictException("User to remove is already not active in this household")
 
         // освободить забронированные задачи
-        taskService.releaseAssignedTasks(removedUser.id!!)
+        val releasedTaskAmount = taskService.releaseAssignedTasks(removedUser.id!!)
 
         // обнулить баланс УДАЛЯЕМОГО ЮЗЕРА в хозяйстве
         transactionService.resetBalance(
@@ -246,13 +253,19 @@ class UserHouseholdServiceImpl(
 //        userHouseholdRepository.save(removedUser) // managed entity
 
         // создать запись USER_REMOVED в ленте активности
+        val description = if (releasedTaskAmount > 0) {
+            "${removedUser.user.name} was removed from household \"${household.name}\" by user ${user.name}. " +
+                    "$releasedTaskAmount tasks were released"
+        } else {
+            "${removedUser.user.name} was removed from household \"${household.name}\" by user ${user.name}. "
+        }
         activityService.createActivityRecord(
             RecordActivityCommand(
                 householdId = household.id!!,
                 memberId = userHousehold.id!!, // действие совершено УДАЛЯЮЩИМ
                 activityType = ActivityType.USER_REMOVED,
                 title = "User removed",
-                description = "${removedUser.user.name} was removed from household \"${household.name}\" by user ${user.name}"
+                description = description,
             )
         )
 

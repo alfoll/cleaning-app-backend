@@ -83,7 +83,7 @@ class UserServiceImpl(
 
             // если это не последний пользователь - обычный сценарий
             // освободить забронированные задачи
-            taskService.releaseAssignedTasks(userHousehold.id!!)
+            val releasedTaskAmount = taskService.releaseAssignedTasks(userHousehold.id!!)
 
             // обнуляем баланс
             transactionService.resetBalance(
@@ -94,13 +94,19 @@ class UserServiceImpl(
             )
 
             // для каждого хозяйства запись в ленте активности USER_LEFT
+            val description = if (releasedTaskAmount > 0) {
+                "${user.name} left household \"${household.name}\". " +
+                        "$releasedTaskAmount tasks were released"
+            } else {
+                "${user.name} left household \"${household.name}\""
+            }
             activityService.createActivityRecord(
                 RecordActivityCommand(
                     householdId = userHousehold.household.id!!,
                     memberId = userHousehold.id!!,
                     activityType = ActivityType.USER_LEFT,
                     title = "User left",
-                    description = "${user.name} left household \"${userHousehold.household.name}\""
+                    description = description
                 )
             )
 
