@@ -14,6 +14,6 @@ class FirebaseAuthServiceImpl(
         return firebaseAuth.verifyIdToken(idToken)
     }
 
-    override fun detUserByUid(uid: String): UserRecord =
+    override fun getUserByUid(uid: String): UserRecord =
         firebaseAuth.getUser(uid)
 }

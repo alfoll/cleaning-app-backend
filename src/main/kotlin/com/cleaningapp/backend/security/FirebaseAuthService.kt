@@ -8,5 +8,5 @@ interface FirebaseAuthService {
     fun verifyToken(idToken: String): FirebaseToken
 
     // достать юзера по uid
-    fun detUserByUid(uid: String): UserRecord
+    fun getUserByUid(uid: String): UserRecord
 }

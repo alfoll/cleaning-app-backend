@@ -77,6 +77,8 @@ class FirebaseAuthFilter (
 
             // в principal поле кладем объект UserDetails -> его в контекст
             val authToken = UsernamePasswordAuthenticationToken(user, null, user.authorities)
+            // чтобы в username точно лежал firebaseUid можно сделать так
+            // val authToken = UsernamePasswordAuthenticationToken(firebaseUid, null, emptyList())
             SecurityContextHolder.getContext().authentication = authToken
 
         } catch (ex: FirebaseAuthException) {

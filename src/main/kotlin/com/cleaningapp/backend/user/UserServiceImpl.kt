@@ -93,12 +93,6 @@ class UserServiceImpl(
                 )
             )
 
-            // деактивируем пользователя
-            userHousehold.isUserActive = false
-
-            // сохраняем изменения - транзакционный сервис, сохранять не обязательно
-//            userHouseholdRepository.save(userHousehold) // managed entity
-
             // для каждого хозяйства запись в ленте активности USER_LEFT
             activityService.createActivityRecord(
                 RecordActivityCommand(
@@ -110,6 +104,11 @@ class UserServiceImpl(
                 )
             )
 
+            // деактивируем пользователя
+            userHousehold.isUserActive = false
+
+            // сохраняем изменения - транзакционный сервис, сохранять не обязательно
+//            userHouseholdRepository.save(userHousehold) // managed entity
         }
 
         // деактивировать самого юзера и сохранить изменения
@@ -141,7 +140,7 @@ class UserServiceImpl(
         val existingUser = getCurrentUser()
 
         // достать пользователя из FB по uid
-        val firebaseUser = firebaseAuthService.detUserByUid(existingUser.firebaseUid)
+        val firebaseUser = firebaseAuthService.getUserByUid(existingUser.firebaseUid)
 
         // взять почту (FB)
         val firebaseEmail = firebaseUser.email
