@@ -4,21 +4,32 @@ import com.google.auth.oauth2.GoogleCredentials
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.auth.FirebaseAuth
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.core.io.ClassPathResource
 
 @Configuration
-class FirebaseConfiguration {
+@ConditionalOnProperty(
+    prefix = "firebase.admin",
+    name = ["enabled"],
+    havingValue = "true",
+    matchIfMissing = true
+)
+class FirebaseConfiguration(
+    private val properties: FirebaseAdminProperties,
+) {
 
     @Bean
     fun firebaseApp(): FirebaseApp {
 
-        val serviceAccount = ClassPathResource("adminsdk-service-account-key.json").inputStream
+        val keyPath = properties.keyPath
+            ?: error("firebase.admin.key-path is required when firebase.admin.enabled=true")
 
-        val options = FirebaseOptions.builder()
-            .setCredentials(GoogleCredentials.fromStream(serviceAccount))
-            .build()
+        val options = keyPath.inputStream.use { inputStream ->
+            FirebaseOptions.builder()
+                .setCredentials(GoogleCredentials.fromStream(inputStream))
+                .build()
+        }
 
         return if (FirebaseApp.getApps().isEmpty()) {
             FirebaseApp.initializeApp(options)
