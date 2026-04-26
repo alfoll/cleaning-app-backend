@@ -26,9 +26,20 @@ import java.util.UUID
     name = "transaction",
     indexes = [
         // транзакции хозяйства (индекс для чтения)
-        Index(name = "idx_transaction_household_id_created_at", columnList = "household_id, created_at"),
+        Index(
+            name = "idx_transaction_household_id_created_at",
+            columnList = "household_id, created_at"
+        ),
         // транзакции участника - мб ваще не надо (индекс для чтения)
-        Index(name = "idx_transaction_member_id_created_at", columnList = "member_id, created_at"),
+        Index(
+            name = "idx_transaction_member_id_created_at",
+            columnList = "member_id, created_at"
+        ),
+        // лидерборд
+        Index(
+            name = "idx_transaction_leaderboard",
+            columnList = "household_id, type, member_id, created_at"
+        )
     ]
 )
 class TransactionEntity(

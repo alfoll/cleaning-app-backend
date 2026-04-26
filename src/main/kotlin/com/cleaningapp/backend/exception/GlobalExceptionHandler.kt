@@ -1,5 +1,6 @@
 package com.cleaningapp.backend.exception
 
+import org.springframework.dao.DataAccessException
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.HttpStatus
 import org.springframework.http.converter.HttpMessageNotReadableException
@@ -96,11 +97,19 @@ class GlobalExceptionHandler {
         return ExcResponse("403 ACCESS_DENIED", e.message)
     }
 
-    // ошибки бд/Hibernate
+    // ошибки бд/Hibernate (нарушение ограничений бд)
     @ExceptionHandler(DataIntegrityViolationException::class)
     @ResponseStatus(HttpStatus.CONFLICT) // 409
     fun handleDataIntegrityViolationException(e: DataIntegrityViolationException): ExcResponse {
         return ExcResponse("409 DATA_INTEGRITY_VIOLATION", e.message)
+    }
+
+    // ошибки чтения/доступа к бд
+    @ExceptionHandler(DataAccessException::class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    fun handleDataAccessException(e: DataAccessException): ExcResponse {
+        e.printStackTrace()
+        return ExcResponse("500 DATABASE_ERROR", "Database operation failed")
     }
 
     // валидация дто
