@@ -22,7 +22,14 @@ repositories {
     mavenCentral()
 }
 
+// для моккирования
+val mockitoAgent by configurations.creating
+
 dependencies {
+    // для моккирования
+    mockitoAgent("org.mockito:mockito-core:5.18.0")
+
+
     implementation("com.google.firebase:firebase-admin:9.7.1")
 
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
@@ -81,4 +88,5 @@ allOpen {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+//    jvmArgs("-javaagent:${mockitoAgent.asPath}")
 }

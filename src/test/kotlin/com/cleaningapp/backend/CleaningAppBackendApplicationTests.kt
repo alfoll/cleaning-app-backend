@@ -1,10 +1,10 @@
 package com.cleaningapp.backend
 
+import com.cleaningapp.backend.base.BaseIntegrationTest
 import org.junit.jupiter.api.Test
-import org.springframework.boot.test.context.SpringBootTest
 
-@SpringBootTest
-class CleaningAppBackendApplicationTests {
+
+class CleaningAppBackendApplicationTests: BaseIntegrationTest() {
 
     @Test
     fun contextLoads() {
