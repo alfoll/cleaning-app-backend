@@ -11,6 +11,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Import
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.bean.override.mockito.MockitoBean
+import org.springframework.transaction.annotation.Transactional
 
 
 // общая настройка для всех остальных классов-тестировщиков
@@ -22,6 +23,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean
     TimeTestConfiguration::class,
     TestDataFactory::class,
 )
+@Transactional
 abstract class BaseIntegrationTest {
 
     // дефолтные переменные
