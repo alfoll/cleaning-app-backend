@@ -12,7 +12,8 @@ import org.springframework.context.annotation.Import
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.transaction.annotation.Transactional
-
+import com.cleaningapp.backend.user.UserEntity
+import org.springframework.beans.factory.annotation.Autowired
 
 // общая настройка для всех остальных классов-тестировщиков
 // моккирует fb
@@ -31,6 +32,21 @@ abstract class BaseIntegrationTest {
     protected val defaultFirebaseEmail = "user@test.com"
     protected val validToken = "valid-token"
 
+    @Autowired
+    protected lateinit var testDataFactory: TestDataFactory
+
+    // helper для protected endpoint-тестов
+    protected fun createLocalUserForValidToken(
+        name: String = "Test User",
+        isActive: Boolean = true,
+    ): UserEntity {
+        return testDataFactory.createTestUser(
+            firebaseUid = defaultFirebaseUid,
+            email = defaultFirebaseEmail,
+            name = name,
+            isActive = isActive,
+        )
+    }
 
     // моккирует fb service -> filter работает и получает данные из mock
     @MockitoBean

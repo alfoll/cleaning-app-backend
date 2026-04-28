@@ -10,10 +10,9 @@ import org.springframework.beans.factory.annotation.Autowired
 import java.time.Clock
 import java.time.LocalDateTime
 
-class TestDataFactoryIntegrationTest() : BaseIntegrationTest() {
 
-    @Autowired
-    lateinit var testDataFactory: TestDataFactory
+// проверка работы TestDataFactory - что создает правильные данные для тестов
+class TestDataFactoryIntegrationTest() : BaseIntegrationTest() {
 
     @Autowired
     private lateinit var userHouseholdRepository: UserHouseholdRepository
