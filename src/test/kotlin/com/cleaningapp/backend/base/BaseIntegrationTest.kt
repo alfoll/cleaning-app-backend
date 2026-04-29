@@ -14,6 +14,11 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.transaction.annotation.Transactional
 import com.cleaningapp.backend.user.UserEntity
 import org.springframework.beans.factory.annotation.Autowired
+import org.junit.jupiter.api.AfterEach
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
+import org.springframework.security.core.context.SecurityContextHolder
+
+
 
 // общая настройка для всех остальных классов-тестировщиков
 // моккирует fb
@@ -64,6 +69,18 @@ abstract class BaseIntegrationTest {
             firebaseUid = defaultFirebaseUid,
             email = defaultFirebaseEmail,
         )
+    }
+
+    // helper для прямых service integration-тестов
+    // имитирует уже прошедшую Firebase-аутентификацию
+    protected fun authenticateAs(firebaseUid: String = defaultFirebaseUid) {
+        SecurityContextHolder.getContext().authentication =
+            UsernamePasswordAuthenticationToken(firebaseUid, null, emptyList())
+    }
+
+    @AfterEach
+    fun clearSecurityContext() {
+        SecurityContextHolder.clearContext()
     }
 
 
