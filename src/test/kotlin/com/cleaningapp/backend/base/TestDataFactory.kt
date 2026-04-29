@@ -19,7 +19,6 @@ import com.cleaningapp.backend.userhousehold.UserHouseholdRepository
 import jakarta.persistence.EntityManager
 import org.springframework.boot.test.context.TestComponent
 import org.springframework.jdbc.core.JdbcTemplate
-import org.springframework.stereotype.Component
 import java.time.Clock
 import java.time.LocalDateTime
 import java.util.UUID
@@ -427,5 +426,56 @@ class TestDataFactory(
         activity.member = member
 
         return activityRepository.save(activity)
+    }
+
+    // изменение времени
+    fun updateTaskTimestamps(
+        taskId: UUID,
+        createdAt: LocalDateTime? = null,
+        assignedAt: LocalDateTime? = null,
+        completedAt: LocalDateTime? = null,
+    ): TaskEntity {
+
+        entityManager.flush()
+
+        createdAt?.let {
+            jdbcTemplate.update(
+                """
+                update task
+                set created_at = ?
+                where id = ?
+            """.trimIndent(),
+                it,
+                taskId,
+            )
+        }
+
+        assignedAt?.let {
+            jdbcTemplate.update(
+                """
+                update task
+                set assigned_at = ?
+                where id = ?
+            """.trimIndent(),
+                it,
+                taskId,
+            )
+        }
+
+        completedAt?.let {
+            jdbcTemplate.update(
+                """
+                update task
+                set completed_at = ?
+                where id = ?
+            """.trimIndent(),
+                it,
+                taskId,
+            )
+        }
+
+        entityManager.clear()
+
+        return taskRepository.findById(taskId).orElseThrow()
     }
 }
