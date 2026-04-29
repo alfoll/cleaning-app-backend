@@ -478,4 +478,31 @@ class TestDataFactory(
 
         return taskRepository.findById(taskId).orElseThrow()
     }
+
+    // для стабильной проверки сортировки по createdAt DESC
+    fun updatePrivilegeCreatedAt(
+        privilegeId: UUID,
+        createdAt: LocalDateTime,
+    ): PrivilegeEntity {
+
+        entityManager.flush()
+
+        val rowsUpdated = jdbcTemplate.update(
+            """
+            update privilege
+            set created_at = ?
+            where id = ?
+        """.trimIndent(),
+            createdAt,
+            privilegeId,
+        )
+
+        require(rowsUpdated == 1) {
+            "Expected to update exactly one privilege row for id=$privilegeId, but updated $rowsUpdated rows"
+        }
+
+        entityManager.clear()
+
+        return privilegeRepository.findById(privilegeId).orElseThrow()
+    }
 }
