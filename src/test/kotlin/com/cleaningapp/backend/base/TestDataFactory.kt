@@ -311,7 +311,7 @@ class TestDataFactory(
 
         // поле createdAt - CreationTimestamp - не сможем изначально вставить по clock
         // меняем через update jdbcTemplate
-        jdbcTemplate.update(
+        val rowsUpdated = jdbcTemplate.update(
             """
                 update "transaction"
                 set created_at = ?
@@ -320,6 +320,9 @@ class TestDataFactory(
             createdAt,
             saved.id,
         )
+        require(rowsUpdated == 1) {
+            "Expected to update exactly one transaction row for id=${saved.id}, but updated $rowsUpdated rows"
+        }
         entityManager.clear()
 
         return transactionRepository.findById(saved.id!!).orElseThrow()
@@ -352,7 +355,7 @@ class TestDataFactory(
 
         // поле createdAt - CreationTimestamp - не сможем изначально вставить по clock
         // меняем через update jdbcTemplate
-        jdbcTemplate.update(
+        val rowsUpdated = jdbcTemplate.update(
             """
                 update "transaction"
                 set created_at = ?
@@ -361,6 +364,9 @@ class TestDataFactory(
             createdAt,
             saved.id,
         )
+        require(rowsUpdated == 1) {
+            "Expected to update exactly one transaction row for id=${saved.id}, but updated $rowsUpdated rows"
+        }
         entityManager.clear()
 
         return transactionRepository.findById(saved.id!!).orElseThrow()
@@ -391,7 +397,7 @@ class TestDataFactory(
 
         // поле createdAt - CreationTimestamp - не сможем изначально вставить по clock
         // меняем через update jdbcTemplate
-        jdbcTemplate.update(
+        val rowsUpdated = jdbcTemplate.update(
             """
                 update "transaction"
                 set created_at = ?
@@ -400,6 +406,9 @@ class TestDataFactory(
             createdAt,
             saved.id,
         )
+        require(rowsUpdated == 1) {
+            "Expected to update exactly one transaction row for id=${saved.id}, but updated $rowsUpdated rows"
+        }
         entityManager.clear()
 
         return transactionRepository.findById(saved.id!!).orElseThrow()
