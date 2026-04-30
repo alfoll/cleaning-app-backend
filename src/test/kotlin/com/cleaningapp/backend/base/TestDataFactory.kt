@@ -514,4 +514,30 @@ class TestDataFactory(
 
         return privilegeRepository.findById(privilegeId).orElseThrow()
     }
+
+    // для стабильной проверки сортировки activity по createdAt DESC
+    fun updateActivityCreatedAt(
+        activityId: UUID,
+        createdAt: LocalDateTime,
+    ): ActivityEntity {
+        entityManager.flush()
+
+        val rowsUpdated = jdbcTemplate.update(
+            """
+            update activity
+            set created_at = ?
+            where id = ?
+        """.trimIndent(),
+            createdAt,
+            activityId,
+        )
+
+        require(rowsUpdated == 1) {
+            "Expected to update exactly one activity row for id=$activityId, but updated $rowsUpdated rows"
+        }
+
+        entityManager.clear()
+
+        return activityRepository.findById(activityId).orElseThrow()
+    }
 }
