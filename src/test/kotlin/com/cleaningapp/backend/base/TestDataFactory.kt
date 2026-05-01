@@ -540,4 +540,30 @@ class TestDataFactory(
 
         return activityRepository.findById(activityId).orElseThrow()
     }
+
+    // для стабильной проверки технической сортировки лидерборда по joinedAt DESC
+    fun updateMembershipJoinedAt(
+        membershipId: UUID,
+        joinedAt: LocalDateTime,
+    ): UserHouseholdEntity {
+        entityManager.flush()
+
+        val rowsUpdated = jdbcTemplate.update(
+            """
+            update user_household
+            set joined_at = ?
+            where id = ?
+        """.trimIndent(),
+            joinedAt,
+            membershipId,
+        )
+
+        require(rowsUpdated == 1) {
+            "Expected to update exactly one membership row for id=$membershipId, but updated $rowsUpdated rows"
+        }
+
+        entityManager.clear()
+
+        return userHouseholdRepository.findById(membershipId).orElseThrow()
+    }
 }
