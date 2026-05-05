@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
 import jakarta.persistence.OptimisticLockException
+import org.springframework.dao.CannotAcquireLockException
+import org.springframework.dao.PessimisticLockingFailureException
 import org.springframework.orm.ObjectOptimisticLockingFailureException
 
 
@@ -173,6 +175,24 @@ class GlobalExceptionHandler {
     fun handleOptimisticLockException(e: OptimisticLockException): ExcResponse {
         return ExcResponse(
             "409 OPTIMISTIC_LOCK_CONFLICT",
+            "Resource was modified by another request. Please retry.",
+        )
+    }
+
+    // pessimistic lock
+    @ExceptionHandler(PessimisticLockingFailureException::class)
+    @ResponseStatus(HttpStatus.CONFLICT) // 409
+    fun handlePessimisticLockingFailureException(e: PessimisticLockingFailureException): ExcResponse {
+        return ExcResponse(
+            "409 PESSIMISTIC_LOCK_CONFLICT",
+            "Resource was modified by another request. Please retry.",
+        )
+    }
+    @ExceptionHandler(CannotAcquireLockException::class)
+    @ResponseStatus(HttpStatus.CONFLICT) // 409
+    fun handleCannotAcquireLockException(e: CannotAcquireLockException): ExcResponse {
+        return ExcResponse(
+            "409 PESSIMISTIC_LOCK_CONFLICT",
             "Resource was modified by another request. Please retry.",
         )
     }

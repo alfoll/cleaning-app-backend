@@ -7,6 +7,7 @@ import com.cleaningapp.backend.exception.EmailAlreadyUsedException
 import com.cleaningapp.backend.exception.UserAlreadyExistsException
 import com.cleaningapp.backend.exception.UserNotActiveException
 import com.cleaningapp.backend.exception.UserNotFoundException
+import com.cleaningapp.backend.household.HouseholdRepository
 import com.cleaningapp.backend.household.HouseholdService
 import com.cleaningapp.backend.security.FirebaseAuthService
 import com.cleaningapp.backend.task.TaskService
@@ -23,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional
 class UserServiceImpl(
     private val userRepository: UserRepository,
     private val userHouseholdRepository: UserHouseholdRepository,
+    private val householdRepository: HouseholdRepository,
 
     private val householdService: HouseholdService,
     private val taskService: TaskService,
@@ -31,7 +33,7 @@ class UserServiceImpl(
     private val firebaseAuthService: FirebaseAuthService,
 ) : UserService {
 
-    // достать юзера из контекста
+    // достать юзера из контекста - read сценарий
     private fun getCurrentUser(): UserEntity {
         val auth = SecurityContextHolder.getContext().authentication
             ?: throw AccessDeniedException("User not authenticated")
@@ -39,6 +41,20 @@ class UserServiceImpl(
         val firebaseUid = auth.name
 
         val user = userRepository.findUserByFirebaseUid(firebaseUid)
+            ?: throw UserNotFoundException()
+
+        if (!user.isActive)
+            throw UserNotActiveException()
+        return user
+    }
+    // блокировка для write сценариев
+    private fun getCurrentUserForUpdate(): UserEntity {
+        val auth = SecurityContextHolder.getContext().authentication
+            ?: throw AccessDeniedException("User not authenticated")
+
+        val firebaseUid = auth.name
+
+        val user = userRepository.findUserByFirebaseUidForUpdate(firebaseUid)
             ?: throw UserNotFoundException()
 
         if (!user.isActive)
@@ -65,31 +81,50 @@ class UserServiceImpl(
 
     // еще подумать, но вроде норм (пока без задач/привилегий/транзакций/активности)
     override fun deleteUser() {
-        // достать активного юзера
-        val user = getCurrentUser()
+        // достать активного юзера - с блокировкой
+        val user = getCurrentUserForUpdate()
 
-        // найти все связи с хозяйствами -> везде деактивировать и обнулить баланс
-        val userHouseholds = userHouseholdRepository.findAllByUserIdAndIsUserActiveTrue(user.id!!)
+        // найти все хозяйства -> везде деактивировать и обнулить баланс
+        // отсортированный порядок
+        val householdIds = userHouseholdRepository
+            .findAllByUserIdAndIsUserActiveTrue(user.id!!)
+            .map { it.household.id!! }
+            .distinct()
+            .sorted()
 
-        for (userHousehold in userHouseholds) {
+        for (householdId in householdIds) {
             // если это последний пользователь КАКОГО-ЛИБО ИЗ СВОИХ ХОЗЯЙСТВ - удаляем хозяйство
-            val household = userHousehold.household
+            // хозяйства + участия с блокировкой
+            val household = householdRepository.findByIdForUpdate(householdId)
+                ?: continue
+
+            val lockedMembership = userHouseholdRepository.findByUserIdAndHouseholdIdForUpdate(user.id!!, householdId)
+                ?: continue
+            if (!lockedMembership.isUserActive)
+                continue
+
+            if (!household.isActive) {
+                lockedMembership.isUserActive = false
+                lockedMembership.balance = 0
+                continue
+            }
+
             val activeMembers = userHouseholdRepository.countByHouseholdIdAndIsUserActiveTrue(household.id!!)
 
             if (activeMembers == 1) {
-                householdService.deleteHousehold(household.id!!)
+                householdService.deleteHouseholdFromSystem(household.id!!)
                 continue
             }
 
             // если это не последний пользователь - обычный сценарий
             // освободить забронированные задачи
-            val releasedTaskAmount = taskService.releaseAssignedTasks(userHousehold.id!!)
+            val releasedTaskAmount = taskService.releaseAssignedTasks(lockedMembership.id!!)
 
             // обнуляем баланс
             transactionService.resetBalance(
                 BalanceResetTransactionCommand(
-                    householdId = userHousehold.household.id!!,
-                    memberId = userHousehold.id!!,
+                    householdId = householdId,
+                    memberId = lockedMembership.id!!,
                 )
             )
 
@@ -102,8 +137,8 @@ class UserServiceImpl(
             }
             activityService.createActivityRecord(
                 RecordActivityCommand(
-                    householdId = userHousehold.household.id!!,
-                    memberId = userHousehold.id!!,
+                    householdId = householdId,
+                    memberId = lockedMembership.id!!,
                     activityType = ActivityType.USER_LEFT,
                     title = "User left",
                     description = description
@@ -111,7 +146,7 @@ class UserServiceImpl(
             )
 
             // деактивируем пользователя
-            userHousehold.isUserActive = false
+            lockedMembership.isUserActive = false
 
             // сохраняем изменения - транзакционный сервис, сохранять не обязательно
 //            userHouseholdRepository.save(userHousehold) // managed entity

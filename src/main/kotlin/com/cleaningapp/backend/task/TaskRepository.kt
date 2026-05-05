@@ -5,7 +5,8 @@ import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import java.util.UUID
-
+import jakarta.persistence.LockModeType
+import org.springframework.data.jpa.repository.Lock
 
 interface TaskRepository: JpaRepository<TaskEntity, UUID> {
     // задачи хозяйства (сорт по созданию сначалп последние)
@@ -33,4 +34,27 @@ interface TaskRepository: JpaRepository<TaskEntity, UUID> {
     @Modifying(flushAutomatically = true, clearAutomatically = false)
     @Query("delete from TaskEntity t where t.household.id = :householdId")
     fun deleteAllByHouseholdId(@Param("householdId") householdId: UUID): Int
+
+    // блокирующий запрос на задачу
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select t from TaskEntity t where t.id = :taskId")
+    fun findByIdForUpdate(@Param("taskId") taskId: UUID): TaskEntity?
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query(
+        """
+        select t
+        from TaskEntity t
+        where t.assignedTo.id = :assignedToId
+          and t.isCompleted = false
+        order by t.id
+        """
+    )
+    fun findAllByAssignedToIdAndIsCompletedFalseForUpdate(
+        @Param("assignedToId") assignedToId: UUID,
+    ): List<TaskEntity>
+
+    // возвращает id хозяйства без блокировки - нужно для порядка блокировки в сервисах
+    @Query("select t.household.id from TaskEntity t where t.id = :taskId")
+    fun findHouseholdIdByTaskId(@Param("taskId") taskId: UUID): UUID?
 }

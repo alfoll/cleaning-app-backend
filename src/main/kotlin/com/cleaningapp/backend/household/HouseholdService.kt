@@ -11,4 +11,6 @@ interface HouseholdService {
     fun findHouseholdById(householdId: UUID): HouseholdResponseDTO
     fun findHouseholdByInviteCode(inviteCode: String): HouseholdResponseDTO
 
+    // удаление хозяйства
+    fun deleteHouseholdFromSystem(householdId: UUID)
 }

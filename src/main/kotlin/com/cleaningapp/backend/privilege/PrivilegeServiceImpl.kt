@@ -59,7 +59,7 @@ class PrivilegeServiceImpl(
         return user
     }
 
-    // достать активное хозяйсто
+    // достать активное хозяйсто - для read сценариев
     private fun getActiveHousehold(householdId: UUID): HouseholdEntity {
         // существует ли хозяйство
         val household = householdRepository.findByIdOrNull(householdId)
@@ -71,8 +71,20 @@ class PrivilegeServiceImpl(
 
         return household
     }
+    // блокировка для write сценариев
+    private fun getActiveHouseholdForUpdate(householdId: UUID): HouseholdEntity {
+        // существует ли хозяйство
+        val household = householdRepository.findByIdForUpdate(householdId)
+            ?: throw HouseholdNotFoundException()
 
-    // досать активную связь
+        // активно ли хозяйство
+        if (!household.isActive)
+            throw HouseholdNotActiveException()
+
+        return household
+    }
+
+    // досать активную связь - для read сценаривеев
     private fun getActiveMembership(userId: UUID, householdId: UUID): UserHouseholdEntity {
         // найти связь (проверить есть ли она)
         val userHousehold = userHouseholdRepository.findByUserIdAndHouseholdId(userId, householdId)
@@ -84,15 +96,32 @@ class PrivilegeServiceImpl(
 
         return userHousehold
     }
+    // блокировка для write сценариев
+    private fun getActiveMembershipForUpdate(userId: UUID, householdId: UUID): UserHouseholdEntity {
+        // найти связь (проверить есть ли она)
+        val userHousehold = userHouseholdRepository.findByUserIdAndHouseholdIdForUpdate(userId, householdId)
+            ?: throw MembershipNotFoundException()
 
-    // достать сущность привилегии
+        // активен ли юзер в этом хозяйстве
+        if (!userHousehold.isUserActive)
+            throw MembershipNotActiveException()
+
+        return userHousehold
+    }
+
+    // достать сущность привилегии - для read сценариев
     private fun getPrivilegeEntity(privilegeId: UUID): PrivilegeEntity =
         privilegeRepository.findByIdOrNull(privilegeId)
+            ?: throw PrivilegeNotFoundException()
+    // блокировка для write сценариев
+    private fun getPrivilegeEntityForUpdate(privilegeId: UUID): PrivilegeEntity =
+        privilegeRepository.findByIdForUpdate(privilegeId)
             ?: throw PrivilegeNotFoundException()
 
     // валидировать привилегию
     // (проверка что пользователь состоит в хозяйстве в котором хочет купить привилегию)
     // возвращает активное участие
+    // для read сценариев только
     private fun validatePrivilegeAccess(privilege: PrivilegeEntity, currentUser: UserEntity): UserHouseholdEntity {
         val household = privilege.household
 
@@ -102,14 +131,14 @@ class PrivilegeServiceImpl(
         return getActiveMembership(currentUser.id!!, household.id!!)
     }
 
+
     // создать привилегию может любой активный участник хозяйства
     override fun createPrivilege(householdId: UUID, privilege: PrivilegeRegisterDTO): PrivilegeResponseDTO {
-        // достать юзера и хозяйство
+        // достать юзера + хозяйство + участие
         val user = getCurrentUser()
-        val household = getActiveHousehold(householdId)
 
-        // достать активное участие
-        val membership = getActiveMembership(user.id!!, household.id!!)
+        val household = getActiveHouseholdForUpdate(householdId)
+        val membership = getActiveMembershipForUpdate(user.id!!, household.id!!)
 
         // сохраняем привилегию
         val savedPrivilege = privilegeRepository.save(privilege.toPrivilegeEntity(household, user))
@@ -131,14 +160,20 @@ class PrivilegeServiceImpl(
     // можно менять только не купленные привилегии
     // менять может только создатель
     override fun updatePrivilege(privilegeId: UUID, newPrivilege: PrivilegeRegisterDTO): PrivilegeResponseDTO {
-        // достать юзера
+        // юзер + хозяйство и участие из привилегии
         val user = getCurrentUser()
 
-        // достать привилегию
-        val privilege = getPrivilegeEntity(privilegeId)
+        val householdId = privilegeRepository.findHouseholdIdByPrivilegeId(privilegeId)
+            ?: throw PrivilegeNotFoundException()
 
-        // валидировать привилегию (проверка наличия активного хозяйства + активного участия)
-        validatePrivilegeAccess(privilege, user)
+        val household = getActiveHouseholdForUpdate(householdId)
+        getActiveMembershipForUpdate(user.id!!, household.id!!)
+
+        // достать привилегию
+        val privilege = getPrivilegeEntityForUpdate(privilegeId)
+
+        if (privilege.household.id != household.id)
+            throw BusinessConflictException("Privilege does not belong to this household")
 
         // если задача куплена - нельзя менять
         if (!privilege.isAvailable || privilege.boughtBy != null)
@@ -160,14 +195,21 @@ class PrivilegeServiceImpl(
 
     // удалить может только создатель
     override fun deletePrivilege(privilegeId: UUID) {
-        // достать юзера
+        // юзер + хозяйство и участие из привилегии
         val user = getCurrentUser()
 
-        // достать привилегию
-        val privilege = getPrivilegeEntity(privilegeId)
+        val householdId = privilegeRepository.findHouseholdIdByPrivilegeId(privilegeId)
+            ?: throw PrivilegeNotFoundException()
 
-        // валидировать привилегию (проверка наличия активного хозяйства + активного участия)
-        validatePrivilegeAccess(privilege, user)
+        val household = getActiveHouseholdForUpdate(householdId)
+        getActiveMembershipForUpdate(user.id!!, household.id!!)
+
+        // достать привилегию
+        val privilege = getPrivilegeEntityForUpdate(privilegeId)
+
+        if (privilege.household.id != household.id)
+            throw BusinessConflictException("Privilege does not belong to this household")
+
 
         // если привилегия куплена - ее нельзя удалить
         if (!privilege.isAvailable || privilege.boughtBy != null)
@@ -182,14 +224,20 @@ class PrivilegeServiceImpl(
     }
 
     override fun buyPrivilege(privilegeId: UUID): PrivilegeResponseDTO {
-        // достать юзера
+        // юзер + хозяйство и участие из привилегии
         val user = getCurrentUser()
 
-        // достать привилегию
-        val privilege = getPrivilegeEntity(privilegeId)
+        val householdId = privilegeRepository.findHouseholdIdByPrivilegeId(privilegeId)
+            ?: throw PrivilegeNotFoundException()
 
-        // валидировать привилегию (проверка наличия активного хозяйства + активного участия)
-        val membership = validatePrivilegeAccess(privilege, user)
+        val household = getActiveHouseholdForUpdate(householdId)
+        val membership = getActiveMembershipForUpdate(user.id!!, household.id!!)
+
+        // достать привилегию
+        val privilege = getPrivilegeEntityForUpdate(privilegeId)
+
+        if (privilege.household.id != household.id)
+            throw BusinessConflictException("Privilege does not belong to this household")
 
         // если привилегия куплена - ее нельзя купить
         if (!privilege.isAvailable || privilege.boughtBy != null)

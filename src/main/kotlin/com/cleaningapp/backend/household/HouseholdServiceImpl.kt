@@ -59,7 +59,7 @@ class HouseholdServiceImpl(
         throw BusinessConflictException("Failed to generate unique invite code")
     }
 
-    // доостать юзера из контекста
+    // достать юзера из контекста - для read сценариев
     private fun getCurrentUser(): UserEntity {
         val auth = SecurityContextHolder.getContext().authentication
             ?: throw AccessDeniedException("User not authenticated")
@@ -73,8 +73,22 @@ class HouseholdServiceImpl(
             throw UserNotActiveException()
         return user
     }
+    // с блокировкой для write сценариев
+    private fun getCurrentUserForUpdate(): UserEntity {
+        val auth = SecurityContextHolder.getContext().authentication
+            ?: throw AccessDeniedException("User not authenticated")
 
-    // достать активное хозяйсто
+        val firebaseUid = auth.name
+
+        val user = userRepository.findUserByFirebaseUidForUpdate(firebaseUid)
+            ?: throw UserNotFoundException()
+
+        if (!user.isActive)
+            throw UserNotActiveException()
+        return user
+    }
+
+    // достать активное хозяйсто - для read сценариев
     private fun getActiveHousehold(householdId: UUID): HouseholdEntity {
         // существует ли хозяйство
         val household = householdRepository.findByIdOrNull(householdId)
@@ -86,8 +100,20 @@ class HouseholdServiceImpl(
 
         return household
     }
+    // с блокировкой для write сценариев
+    private fun getActiveHouseholdForUpdate(householdId: UUID): HouseholdEntity {
+        // существует ли хозяйство
+        val household = householdRepository.findByIdForUpdate(householdId)
+            ?: throw HouseholdNotFoundException()
 
-    // досать активную связь
+        // активно ли хозяйство
+        if (!household.isActive)
+            throw HouseholdNotActiveException()
+
+        return household
+    }
+
+    // досать активную связь - для read сценариев
     private fun getActiveMembership(userId: UUID, householdId: UUID): UserHouseholdEntity {
         // найти связь (проверить есть ли она)
         val userHousehold = userHouseholdRepository.findByUserIdAndHouseholdId(userId, householdId)
@@ -99,6 +125,19 @@ class HouseholdServiceImpl(
 
         return userHousehold
     }
+    // с блокировкой для write сценариев
+    private fun getActiveMembershipForUpdate(userId: UUID, householdId: UUID): UserHouseholdEntity {
+        // найти связь (проверить есть ли она)
+        val userHousehold = userHouseholdRepository.findByUserIdAndHouseholdIdForUpdate(userId, householdId)
+            ?: throw MembershipNotFoundException()
+
+        // активен ли юзер в этом хозяйстве
+        if (!userHousehold.isUserActive)
+            throw MembershipNotActiveException()
+
+        return userHousehold
+    }
+
 
     // полное удаление хозяйства (жесткое удаление транзакций потом активности + задач + привилегий)
     private fun deleteHouseholdInternal(household: HouseholdEntity) {
@@ -106,7 +145,7 @@ class HouseholdServiceImpl(
         household.isActive = false
 
         // найти участников (всех, а не только активных - на всякий случай)
-        val members = userHouseholdRepository.findAllByHouseholdId(household.id!!)
+        val members = userHouseholdRepository.findAllByHouseholdIdForUpdate(household.id!!)
 
         // всех деактивировать и обнулить балансы
         members.forEach {
@@ -126,7 +165,7 @@ class HouseholdServiceImpl(
 
     override fun createHousehold(household: HouseholdRegisterDTO): HouseholdResponseDTO {
         // достать создателя
-        val user = getCurrentUser()
+        val user = getCurrentUserForUpdate()
 
         // проверить лимит в 3 хозяйства у юзера
         if (userHouseholdRepository.countByUserIdAndIsUserActiveTrue(user.id!!) >= 3)
@@ -173,30 +212,36 @@ class HouseholdServiceImpl(
     }
 
     override fun deleteHousehold(householdId: UUID) {
-        // достать активное хозяйство
-        val household = getActiveHousehold(householdId)
-
-        // достать юзера
+        // достать юзера + хозяйство + участие
         val user = getCurrentUser()
-
-        // проверить участие
-        getActiveMembership(user.id!!, household.id!!)
+        val household = getActiveHouseholdForUpdate(householdId)
+        getActiveMembershipForUpdate(user.id!!, household.id!!)
 
         // удаление без resetBalance и releaseAssignedTasks
         // так как все транзакции + активность + задачи + привилегии удаляются жестко
         deleteHouseholdInternal(household)
     }
 
+    override fun deleteHouseholdFromSystem(householdId: UUID) {
+        val household = householdRepository.findByIdForUpdate(householdId)
+            ?: throw HouseholdNotFoundException()
+
+        if (!household.isActive)
+            return
+
+        deleteHouseholdInternal(household)
+    }
+
     // обновить можно только название
     override fun updateHousehold(householdId: UUID, newHousehold: HouseholdRegisterDTO): HouseholdResponseDTO {
         // достать активное хозяйство
-        val household = getActiveHousehold(householdId)
+        val household = getActiveHouseholdForUpdate(householdId)
 
         // достать юзера
         val user = getCurrentUser()
 
         // проверить участие
-        getActiveMembership(user.id!!, household.id!!)
+        getActiveMembershipForUpdate(user.id!!, household.id!!)
 
         // обновить название (обновляться может только оно) и сохранить
         household.name = newHousehold.name

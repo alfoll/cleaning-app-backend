@@ -55,6 +55,7 @@ class TransactionServiceImpl(
 
     // достать активное хозяйсто
     // для публичных методов, где хозяйство приходит из апи
+    // read сценарии
     private fun getActiveHousehold(householdId: UUID): HouseholdEntity {
         // существует ли хозяйство
         val household = householdRepository.findByIdOrNull(householdId)
@@ -66,9 +67,21 @@ class TransactionServiceImpl(
 
         return household
     }
+    // с блокировкой для write сценариев
+    private fun getActiveHouseholdForUpdate(householdId: UUID): HouseholdEntity {
+        // существует ли хозяйство
+        val household = householdRepository.findByIdForUpdate(householdId)
+            ?: throw HouseholdNotFoundException()
+
+        // активно ли хозяйство
+        if (!household.isActive)
+            throw HouseholdNotActiveException()
+
+        return household
+    }
 
     // досать активную связь
-    //для публичных методов для проверки доступа
+    // для публичных методов для проверки доступа - только read сценарии
     private fun getActiveMembership(userId: UUID, householdId: UUID): UserHouseholdEntity {
         // найти связь (проверить есть ли она)
         val userHousehold = userHouseholdRepository.findByUserIdAndHouseholdId(userId, householdId)
@@ -81,15 +94,15 @@ class TransactionServiceImpl(
         return userHousehold
     }
 
-    // достать связь без проверки активности
-    private fun getMembershipEntity(memberId: UUID): UserHouseholdEntity =
-        userHouseholdRepository.findByIdOrNull(memberId)
+    // достать связь без проверки активности - только для write сценариев
+    private fun getMembershipEntityForUpdate(memberId: UUID): UserHouseholdEntity =
+        userHouseholdRepository.findByIdForUpdate(memberId)
             ?: throw MembershipNotFoundException()
 
     // достать активную связь по member_id
-    // для записей
-    private fun getActiveMembershipEntity(memberId: UUID): UserHouseholdEntity {
-        val membership = userHouseholdRepository.findByIdOrNull(memberId)
+    // только для write сценариев
+    private fun getActiveMembershipEntityForUpdate(memberId: UUID): UserHouseholdEntity {
+        val membership = userHouseholdRepository.findByIdForUpdate(memberId)
             ?: throw MembershipNotFoundException()
 
         if (!membership.isUserActive)
@@ -101,14 +114,14 @@ class TransactionServiceImpl(
         return membership
     }
 
-    // достать сущность задачи
-    private fun getTaskEntity(taskId: UUID): TaskEntity =
-        taskRepository.findByIdOrNull(taskId)
+    // достать сущность задачи - только write сценарии - блокировка
+    private fun getTaskEntityForUpdate(taskId: UUID): TaskEntity =
+        taskRepository.findByIdForUpdate(taskId)
             ?: throw TaskNotFoundException()
 
-    // достать сущность привилегии
-    private fun getPrivilegeEntity(privilegeId: UUID): PrivilegeEntity =
-        privilegeRepository.findByIdOrNull(privilegeId)
+    // достать сущность привилегии - только write сценарии - блокировка
+    private fun getPrivilegeEntityForUpdate(privilegeId: UUID): PrivilegeEntity =
+        privilegeRepository.findByIdForUpdate(privilegeId)
             ?: throw PrivilegeNotFoundException()
 
     // создание транзакции
@@ -153,18 +166,17 @@ class TransactionServiceImpl(
 
     // транзакция может быть создана только на выполненную задачу, у которой еще нет транзакции
     override fun recordTaskCompletion(command: TaskCompletionTransactionCommand) {
-        // достать задачу
-        val task = getTaskEntity(command.taskId)
-
-        // достать участника
-        val member = getActiveMembershipEntity(command.memberId)
+        // достать хозяйство + участника + задачу - блокировка
+        val household = getActiveHouseholdForUpdate(command.householdId)
+        val member = getActiveMembershipEntityForUpdate(command.memberId)
+        val task = getTaskEntityForUpdate(command.taskId)
 
         // проверить что участник состоит в переданном хозяйстве (id хозяйства из команды и из участия совпадают)
-        if (member.household.id != command.householdId)
+        if (member.household.id != household.id!!)
             throw BusinessConflictException("Membership does not belong to the specified household")
 
         // проверить что задача находится в переданном хозяйстве (id хозяйства из команды и из задачи совпадают)
-        if (task.household.id != command.householdId)
+        if (task.household.id != household.id!!)
             throw BusinessConflictException("Task does not belong to the specified household")
 
         // задача действительно выполнена
@@ -201,18 +213,18 @@ class TransactionServiceImpl(
 
     // транзакция может быть создана только на купленную привилегию, у которой еще нет транзакции
     override fun recordPrivilegePurchase(command: PrivilegePurchaseTransactionCommand) {
-        // достать привилегию
-        val privilege = getPrivilegeEntity(command.privilegeId)
+        // достать участника + привилегию
+        val household = getActiveHouseholdForUpdate(command.householdId)
+        val member = getActiveMembershipEntityForUpdate(command.memberId)
+        val privilege = getPrivilegeEntityForUpdate(command.privilegeId)
 
-        // достать участника
-        val member = getActiveMembershipEntity(command.memberId)
 
         // проверить что участник состоит в переданном хозяйстве (id хозяйства из команды и из участия совпадают)
-        if (member.household.id != command.householdId)
+        if (member.household.id != household.id!!)
             throw BusinessConflictException("Membership does not belong to the specified household")
 
         // проверить что привилегия находится в переданном хозяйстве (id хозяйства из команды и из привилегии совпадают)
-        if (privilege.household.id != command.householdId)
+        if (privilege.household.id != household.id!!)
             throw BusinessConflictException("Privilege does not belong to the specified household")
 
         // привилегия должна быть отмечена купленной
@@ -255,11 +267,15 @@ class TransactionServiceImpl(
     // вычитается весь баланс, достается из связи
     // служебная операция, применяется при удалении/выходе -> активность хозяйства или участия не нужна
     override fun resetBalance(command: BalanceResetTransactionCommand) {
+        // достать хозяйство (необязательно активное)
+        val household = householdRepository.findByIdForUpdate(command.householdId)
+            ?: throw HouseholdNotFoundException()
+
         // достать участника у которого обнуляется баланс (не обязательно активного)
-        val member = getMembershipEntity(command.memberId)
+        val member = getMembershipEntityForUpdate(command.memberId)
 
         // проверить что участник состоит в переданном хозяйстве (id хозяйства из команды и из участия совпадают)
-        if (member.household.id != command.householdId)
+        if (member.household.id != household.id!!)
             throw BusinessConflictException("Membership does not belong to the specified household")
 
         // проверить что баланс неотрицательный - иначе нельзя списывать

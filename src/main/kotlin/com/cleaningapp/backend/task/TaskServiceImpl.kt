@@ -61,7 +61,7 @@ class TaskServiceImpl(
         return user
     }
 
-    // достать активное хозяйсто
+    // достать активное хозяйсто - для read сценариев
     private fun getActiveHousehold(householdId: UUID): HouseholdEntity {
         // существует ли хозяйство
         val household = householdRepository.findByIdOrNull(householdId)
@@ -73,11 +73,35 @@ class TaskServiceImpl(
 
         return household
     }
+    // блокировки для write сценариев
+    private fun getActiveHouseholdForUpdate(householdId: UUID): HouseholdEntity {
+        // существует ли хозяйство
+        val household = householdRepository.findByIdForUpdate(householdId)
+            ?: throw HouseholdNotFoundException()
 
-    // досать активную связь
+        // активно ли хозяйство
+        if (!household.isActive)
+            throw HouseholdNotActiveException()
+
+        return household
+    }
+
+    // досать активную связь - для read сценариев
     private fun getActiveMembership(userId: UUID, householdId: UUID): UserHouseholdEntity {
         // найти связь (проверить есть ли она)
         val userHousehold = userHouseholdRepository.findByUserIdAndHouseholdId(userId, householdId)
+            ?: throw MembershipNotFoundException()
+
+        // активен ли юзер в этом хозяйстве
+        if (!userHousehold.isUserActive)
+            throw MembershipNotActiveException()
+
+        return userHousehold
+    }
+    // блокировки для write сценариев
+    private fun getActiveMembershipForUpdate(userId: UUID, householdId: UUID): UserHouseholdEntity {
+        // найти связь (проверить есть ли она)
+        val userHousehold = userHouseholdRepository.findByUserIdAndHouseholdIdForUpdate(userId, householdId)
             ?: throw MembershipNotFoundException()
 
         // активен ли юзер в этом хозяйстве
@@ -91,8 +115,13 @@ class TaskServiceImpl(
     private fun getTaskEntity(taskId: UUID): TaskEntity =
         taskRepository.findByIdOrNull(taskId)
             ?: throw TaskNotFoundException()
+    // с блкировкой на write сценарии
+    private fun getTaskEntityForUpdate(taskId: UUID): TaskEntity =
+        taskRepository.findByIdForUpdate(taskId)
+            ?: throw TaskNotFoundException()
 
     // проверить что пользователь состоит в хозяйстве в котором хочет взять задачу
+    // только для read сценариев - для поддержания порядка блокировки
     private fun validateTaskAccess(task: TaskEntity, currentUser: UserEntity): UserHouseholdEntity {
         val household = task.household
 
@@ -102,14 +131,14 @@ class TaskServiceImpl(
         return getActiveMembership(currentUser.id!!, household.id!!)
     }
 
+
     // создать задачу может любой активный участник хозяйсвта
     override fun createTask(householdId: UUID, task: TaskRegisterDTO): TaskResponseDTO {
-        // достать юзера и активное хозяйство
+        // достать юзера + активное хозяйство + участие
         val user = getCurrentUser()
-        val household = getActiveHousehold(householdId)
 
-        // проверить состоит ли юзер в хозяйстве и активен ли в нем + для ленты активности
-        val membership = getActiveMembership(user.id!!, household.id!!)
+        val household = getActiveHouseholdForUpdate(householdId)
+        val membership = getActiveMembershipForUpdate(user.id!!, household.id!!)
 
         // сохраняем задачу
         val savedTask = taskRepository.save(task.toTaskEntity(user, household))
@@ -131,16 +160,20 @@ class TaskServiceImpl(
     // нельзя менять условия задачи если она взята в работу (забронена) или выполнена
     // только создатель может менять задачу
     override fun updateTask(taskId: UUID, newTask: TaskRegisterDTO): TaskResponseDTO {
-        // достать юзера - поему не достаем активное хозяйство?
-        // потому что в валидации доступа берется уже существующее хозяйтство задачи проверяется его активность
-        // и проверяется активная связь - все вместе
+        // юзер + хозяйство и участие из задачи
         val user = getCurrentUser()
 
-        // достать задачу
-        val task = getTaskEntity(taskId)
+        val householdId = taskRepository.findHouseholdIdByTaskId(taskId)
+            ?: throw TaskNotFoundException()
 
-        // как раз проверка наличия активного хозяйства + активного участия
-        validateTaskAccess(task, user)
+        val household = getActiveHouseholdForUpdate(householdId)
+        getActiveMembershipForUpdate(user.id!!, householdId)
+
+        // достать задачу
+        val task = getTaskEntityForUpdate(taskId)
+
+        if (task.household.id != household.id)
+            throw BusinessConflictException("Task does not belong to this household")
 
         // если задача выполнена - нельзя менять
         if (task.isCompleted)
@@ -166,14 +199,20 @@ class TaskServiceImpl(
     // массовая сущность - если свободна то можно жестко удалить
     // только создатель может удалять задачу
     override fun deleteTask(taskId: UUID) {
-        // достать юзера
+        // юзер + хозяйство и участие из задачи
         val user = getCurrentUser()
 
-        // достать задачу
-        val task = getTaskEntity(taskId)
+        val householdId = taskRepository.findHouseholdIdByTaskId(taskId)
+            ?: throw TaskNotFoundException()
 
-        // валидировать - хозяйство задачи активно + юзер в нем активен
-        validateTaskAccess(task, user)
+        val household = getActiveHouseholdForUpdate(householdId)
+        getActiveMembershipForUpdate(user.id!!, household.id!!)
+
+        // достать задачу
+        val task = getTaskEntityForUpdate(taskId)
+
+        if (task.household.id != household.id)
+            throw BusinessConflictException("Task does not belong to this household")
 
         // нельзя удалять выполненную задачу
         if (task.isCompleted)
@@ -187,19 +226,25 @@ class TaskServiceImpl(
         if (task.createdBy.id != user.id)
             throw BusinessConflictException("Only creator can delete task")
 
-        taskRepository.delete(task) // как реализовать удаление - жестко или как с юзерами и хозяйствами (мягко)?
+        taskRepository.delete(task)
     }
 
     // бронирует задачу текущему пользователю - мне
     override fun assignTask(taskId: UUID): TaskResponseDTO {
-        // достать юзера
+        // юзер + хозяйство и участие из задачи
         val user = getCurrentUser()
 
-        // достать задачу
-        val task = getTaskEntity(taskId)
+        val householdId = taskRepository.findHouseholdIdByTaskId(taskId)
+            ?: throw TaskNotFoundException()
 
-        // валидировать задачу (активность хозяйства задачи + участия юзера в хозяйстве) + достать связь
-        val membership = validateTaskAccess(task, user)
+        val household = getActiveHouseholdForUpdate(householdId)
+        val membership = getActiveMembershipForUpdate(user.id!!, household.id!!)
+
+        // достать задачу
+        val task = getTaskEntityForUpdate(taskId)
+
+        if (task.household.id != household.id)
+            throw BusinessConflictException("Task does not belong to this household")
 
         // нельзя забронировать выполненную задачу
         if (task.isCompleted)
@@ -230,14 +275,20 @@ class TaskServiceImpl(
 
     // снять бронь с задачи может только тот кто ее забронировал
     override fun unassignTask(taskId: UUID): TaskResponseDTO {
-        // достать юзера
+        // юзер + хозяйство и участие из задачи
         val user = getCurrentUser()
 
-        // достать задачу
-        val task = getTaskEntity(taskId)
+        val householdId = taskRepository.findHouseholdIdByTaskId(taskId)
+            ?: throw TaskNotFoundException()
 
-        // валидировать (хозяйство задачи активно + юзер в нем состоит и активен) - возвращается связь
-        val membership = validateTaskAccess(task, user)
+        val household = getActiveHouseholdForUpdate(householdId)
+        val membership = getActiveMembershipForUpdate(user.id!!, household.id!!)
+
+        // достать задачу
+        val task = getTaskEntityForUpdate(taskId)
+
+        if (task.household.id != household.id)
+            throw BusinessConflictException("Task does not belong to this household")
 
         // нельзя освободить выполненную задачу
         if (task.isCompleted)
@@ -274,14 +325,20 @@ class TaskServiceImpl(
     // после завершения начисляется награда
     // НАЧИСЛЕНИЕ ВЫНЕСТИ В СЕРВИС ТРАНЗАКЦИЙ
     override fun completeTask(taskId: UUID): TaskResponseDTO {
-        // достать юзера
+      // юзер + хозяйство и участие из задачи
         val user = getCurrentUser()
 
-        // достать задачу
-        val task = getTaskEntity(taskId)
+        val householdId = taskRepository.findHouseholdIdByTaskId(taskId)
+            ?: throw TaskNotFoundException()
 
-        // валидировать (хозяйство задачи активно + юзер в нем состоит и активен) + достать связь
-        val membership = validateTaskAccess(task, user)
+        val household = getActiveHouseholdForUpdate(householdId)
+        val membership = getActiveMembershipForUpdate(user.id!!, household.id!!)
+
+        // достать задачу
+        val task = getTaskEntityForUpdate(taskId)
+
+        if (task.household.id != household.id)
+            throw BusinessConflictException("Task does not belong to this household")
 
         // нельзя завершить уже завершенную задачу
         if (task.isCompleted)
@@ -379,19 +436,18 @@ class TaskServiceImpl(
     }
 
     // для UserHouseholdService - при удалении/выходе пользователя - через участие
-    // для UserService - приудалении пользователя из системы - через участие
+    // для UserService - при удалении пользователя из системы - через участие
+    // метод должен вызываться только после блокировки Household и UserHousehold,
+    // иначе можно нарушить общий порядок lock-ов.
     override fun releaseAssignedTasks(userHouseholdId: UUID): Int {
-        // достали все незавершенные задачи участника
-        val tasks = taskRepository.findAllByAssignedToIdAndIsCompletedFalse(userHouseholdId)
+        // достали все незавершенные задачи участника - блокировка на задачи
+        val tasks = taskRepository.findAllByAssignedToIdAndIsCompletedFalseForUpdate(userHouseholdId)
 
         // освободить
         tasks.forEach { task ->
             task.assignedTo = null
             task.assignedAt = null
         }
-
-        // не возвращаем, просто сохраняем
-//        taskRepository.saveAll(tasks) // все managed entity - сохранять не нужно
 
         // возвращаем количество освобожденных задач
         return tasks.size
