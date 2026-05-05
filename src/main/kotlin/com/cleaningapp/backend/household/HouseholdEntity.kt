@@ -10,6 +10,7 @@ import jakarta.persistence.Id
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
+import jakarta.persistence.Version
 import org.hibernate.annotations.CreationTimestamp
 import java.time.LocalDateTime
 import java.util.UUID
@@ -33,7 +34,12 @@ class HouseholdEntity(
     val createdAt: LocalDateTime = LocalDateTime.now(),
 
     @Column(name = "is_active", nullable = false)
-    var isActive: Boolean = true, // false?
+    var isActive: Boolean = true,
+
+
+    @Version
+    @Column(name = "version", nullable = false)
+    var version: Long = 0L,
 ) {
 
     @ManyToOne(fetch = FetchType.LAZY)

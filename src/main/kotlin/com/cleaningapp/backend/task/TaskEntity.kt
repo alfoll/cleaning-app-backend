@@ -16,6 +16,8 @@ import jakarta.persistence.Table
 import org.hibernate.annotations.CreationTimestamp
 import java.time.LocalDateTime
 import java.util.UUID
+import jakarta.persistence.Version
+
 
 @Entity
 @Table(
@@ -46,8 +48,6 @@ class TaskEntity(
     @Column(name = "reward", nullable = false)
     var reward: Int,
 
-    // добавить isAssigned? - не надо, вдруг рассинхрон - лучше проверять через наличие брони
-
     @Column(name = "assigned_at")
     var assignedAt: LocalDateTime? = null,
 
@@ -56,6 +56,10 @@ class TaskEntity(
 
     @Column(name = "completed_at")
     var completedAt: LocalDateTime? = null,
+
+    @Version
+    @Column(name = "version", nullable = false)
+    var version: Long = 0L,
 ) {
 
     @ManyToOne(fetch = FetchType.LAZY)

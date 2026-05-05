@@ -40,9 +40,10 @@ class UserHouseholdEntity(
     @Column(name = "is_user_active", nullable = false)
     var isUserActive: Boolean = true,
 
-//    @Version
-//    @Column
-//    var version: Long = 0L,
+
+    @Version
+    @Column(name = "version", nullable = false)
+    var version: Long = 0L,
 ) {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)

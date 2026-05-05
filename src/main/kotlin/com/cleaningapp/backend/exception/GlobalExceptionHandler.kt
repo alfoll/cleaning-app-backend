@@ -10,6 +10,9 @@ import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
+import jakarta.persistence.OptimisticLockException
+import org.springframework.orm.ObjectOptimisticLockingFailureException
+
 
 @RestControllerAdvice
 class GlobalExceptionHandler {
@@ -154,5 +157,23 @@ class GlobalExceptionHandler {
     fun handleException(e: Exception): ExcResponse {
         e.printStackTrace() // стектрейс
         return ExcResponse("500 INTERNAL_SERVER_ERROR", "Unexpected server error")
+    }
+
+    // optimistic lock
+    @ExceptionHandler(ObjectOptimisticLockingFailureException::class)
+    @ResponseStatus(HttpStatus.CONFLICT) // 409
+    fun handleObjectOptimisticLockingFailureException(e: ObjectOptimisticLockingFailureException): ExcResponse {
+        return ExcResponse(
+            "409 OPTIMISTIC_LOCK_CONFLICT",
+            "Resource was modified by another request. Please retry.",
+        )
+    }
+    @ExceptionHandler(OptimisticLockException::class)
+    @ResponseStatus(HttpStatus.CONFLICT) // 409
+    fun handleOptimisticLockException(e: OptimisticLockException): ExcResponse {
+        return ExcResponse(
+            "409 OPTIMISTIC_LOCK_CONFLICT",
+            "Resource was modified by another request. Please retry.",
+        )
     }
 }
