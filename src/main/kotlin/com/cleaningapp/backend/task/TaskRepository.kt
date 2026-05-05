@@ -12,7 +12,6 @@ interface TaskRepository: JpaRepository<TaskEntity, UUID> {
     fun findAllByHouseholdIdOrderByCreatedAtDesc(householdId: UUID): List<TaskEntity>
 
     // выполненные и не выполненные задачи хозяйства (сорт по выполнению - сначала последние)
-    fun findAllByHouseholdIdAndIsCompletedFalseOrderByCompletedAtDesc(householdId: UUID): List<TaskEntity>
     fun findAllByHouseholdIdAndIsCompletedTrueOrderByCompletedAtDesc(householdId: UUID): List<TaskEntity>
 
     // чтобы освобождать забронированные невыполненные задачи (сорт не нужен - внуренний метод)
