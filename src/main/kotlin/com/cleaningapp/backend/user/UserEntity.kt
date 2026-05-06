@@ -32,10 +32,10 @@ class UserEntity(
     @Column(name = "id", columnDefinition = "uuid", nullable = false, updatable = false)
     var id: UUID? = null, // JPA сам генерит id при сохранении в бд
 
-    @Column(name = "firebase_uid", nullable = false, unique = true)
+    @Column(name = "firebase_uid", nullable = false)
     val firebaseUid: String,
 
-    @Column(name = "email", nullable = false, unique = true)
+    @Column(name = "email", nullable = false)
     var email: String,
 
     @Column(name = "name", nullable = false)

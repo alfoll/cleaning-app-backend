@@ -35,7 +35,7 @@ class HouseholdEntity(
     @Column(name = "name", nullable = false)
     var name: String,
 
-    @Column(name = "invite_code", nullable = false, unique = true, updatable = false)
+    @Column(name = "invite_code", nullable = false, updatable = false)
     var inviteCode: String = "",
 
     @Column(name = "created_at", nullable = false, updatable = false)

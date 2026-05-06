@@ -42,7 +42,7 @@ import java.util.UUID
             columnList = "household_id, type, member_id, created_at"
         )
     ],
-    uniqueConstraints = [
+    uniqueConstraints = [ // сейчас создается не так а автоматом через OneToOne -> в миграциях явно прописать
         UniqueConstraint(
             name = "uk_transaction_task_id",
             columnNames = ["task_id"]
@@ -82,10 +82,10 @@ class TransactionEntity(
     lateinit var member: UserHouseholdEntity
 
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "task_id", updatable = false, unique = true) // подумать про уникальность
+    @JoinColumn(name = "task_id", updatable = false) // подумать про уникальность
     var task: TaskEntity? = null
 
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "privilege_id", updatable = false, unique = true) // подумать про уникальность
+    @JoinColumn(name = "privilege_id", updatable = false) // подумать про уникальность
     var privilege: PrivilegeEntity? = null
 }
