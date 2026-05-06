@@ -9,6 +9,6 @@ data class UserUpdateDTO(
     @field:Size(min = 2, max = 30, message = "Name must be between 2 and 30")
     val name: String,
 
-    @field:Size(max = 500, message = "Avatar URL must be at most 500 characters")
+    @field:Size(max = 255, message = "Avatar URL must be at most 255 characters")
     val avatarUrl: String? = null,
 )

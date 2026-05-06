@@ -9,7 +9,6 @@ import jakarta.persistence.FetchType
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
-import jakarta.persistence.Index
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
@@ -20,14 +19,7 @@ import jakarta.persistence.Version
 
 
 @Entity
-@Table(
-    name = "task",
-    indexes = [
-        Index(name = "idx_task_household_created_at", columnList = "household_id, created_at"),
-        Index(name = "idx_task_household_completed", columnList = "household_id, is_completed"),
-        Index(name = "idx_task_assigned_to", columnList = "assigned_to")
-    ]
-)
+@Table(name = "task")
 class TaskEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

@@ -10,7 +10,6 @@ import jakarta.persistence.FetchType
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
-import jakarta.persistence.Index
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
@@ -19,23 +18,7 @@ import java.time.LocalDateTime
 import java.util.UUID
 
 @Entity
-@Table(
-    name = "activity",
-    indexes = [
-        Index(
-            name = "idx_activity_household_created_at",
-            columnList = "household_id, created_at"
-        ),
-        Index(
-            name = "idx_activity_household_type_created_at",
-            columnList = "household_id, activity_type, created_at"
-        ),
-        Index(
-            name = "idx_activity_household_member_created_at",
-            columnList = "household_id, member_id, created_at"
-        ),
-    ]
-)
+@Table(name = "activity")
 class ActivityEntity(
 
     @Id

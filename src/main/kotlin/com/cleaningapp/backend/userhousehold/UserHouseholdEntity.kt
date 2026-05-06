@@ -11,22 +11,13 @@ import jakarta.persistence.Id
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
-import jakarta.persistence.UniqueConstraint
 import jakarta.persistence.Version
 import org.hibernate.annotations.CreationTimestamp
 import java.time.LocalDateTime
 import java.util.UUID
 
 @Entity
-@Table(
-    name = "user_household",
-    uniqueConstraints = [
-        UniqueConstraint(
-            name = "uk_user_household_user_id_household_id",
-            columnNames = ["user_id", "household_id"]
-        )
-    ]
-)
+@Table(name = "user_household")
 class UserHouseholdEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

@@ -12,47 +12,16 @@ import jakarta.persistence.FetchType
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
-import jakarta.persistence.Index
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.OneToOne
 import jakarta.persistence.Table
-import jakarta.persistence.UniqueConstraint
 import org.hibernate.annotations.CreationTimestamp
 import java.time.LocalDateTime
 import java.util.UUID
 
 @Entity
-@Table(
-    name = "transaction",
-    indexes = [
-        // транзакции хозяйства (индекс для чтения)
-        Index(
-            name = "idx_transaction_household_id_created_at",
-            columnList = "household_id, created_at"
-        ),
-        // транзакции участника - мб ваще не надо (индекс для чтения)
-        Index(
-            name = "idx_transaction_member_id_created_at",
-            columnList = "member_id, created_at"
-        ),
-        // лидерборд
-        Index(
-            name = "idx_transaction_leaderboard",
-            columnList = "household_id, type, member_id, created_at"
-        )
-    ],
-    uniqueConstraints = [ // сейчас создается не так а автоматом через OneToOne -> в миграциях явно прописать
-        UniqueConstraint(
-            name = "uk_transaction_task_id",
-            columnNames = ["task_id"]
-        ),
-        UniqueConstraint(
-            name = "uk_transaction_privilege_id",
-            columnNames = ["privilege_id"]
-        )
-    ]
-)
+@Table(name = "`transaction`")
 class TransactionEntity(
 
     @Id

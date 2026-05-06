@@ -14,6 +14,6 @@ data class UserRegisterDTO(
     @field:Size(max = 254, message = "Email must be at most 254 characters")
     val email: String,
 
-    @field:Size(max = 500, message = "Avatar URL must be at most 500 characters")
+    @field:Size(max = 255, message = "Avatar URL must be at most 255 characters")
     val avatarUrl: String? = null,
 )
