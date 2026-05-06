@@ -21,7 +21,10 @@ import java.util.UUID
 @Table(
     name = "user_household",
     uniqueConstraints = [
-        UniqueConstraint(columnNames = ["user_id", "household_id"])
+        UniqueConstraint(
+            name = "uk_user_household_user_id_household_id",
+            columnNames = ["user_id", "household_id"]
+        )
     ]
 )
 class UserHouseholdEntity(

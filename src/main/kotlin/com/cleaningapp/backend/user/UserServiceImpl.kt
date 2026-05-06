@@ -79,7 +79,7 @@ class UserServiceImpl(
         return userRepository.save(userEntity).toDTO()
     }
 
-    // еще подумать, но вроде норм (пока без задач/привилегий/транзакций/активности)
+    // не является глобальным mutex для всех действий пользователя
     override fun deleteUser() {
         // достать активного юзера - с блокировкой
         val user = getCurrentUserForUpdate()

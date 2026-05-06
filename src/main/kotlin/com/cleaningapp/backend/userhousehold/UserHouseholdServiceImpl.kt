@@ -195,11 +195,6 @@ class UserHouseholdServiceImpl(
             )
         )
 
-
-        // деактивировать участие и сохранить изменения
-        userHousehold.isUserActive = false
-//        userHouseholdRepository.save(userHousehold) // managed entity
-
         // создать запись USER_LEFT в ленте активности
         val description = if (releasedTaskAmount > 0) {
             "${user.name} left household \"${household.name}\". " +
@@ -216,6 +211,10 @@ class UserHouseholdServiceImpl(
                 description = description
             )
         )
+
+        // деактивировать участие и сохранить изменения
+        userHousehold.isUserActive = false
+//        userHouseholdRepository.save(userHousehold) // managed entity
     }
 
     override fun removeUserFromHousehold(householdId: UUID, userToRemoveId: UUID) {

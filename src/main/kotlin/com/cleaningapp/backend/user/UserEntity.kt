@@ -6,13 +6,26 @@ import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.Table
+import jakarta.persistence.UniqueConstraint
 import jakarta.persistence.Version
 import org.hibernate.annotations.CreationTimestamp
 import java.time.LocalDateTime
 import java.util.UUID
 
 @Entity
-@Table(name = "`user`")
+@Table(
+    name = "`user`",
+    uniqueConstraints = [
+        UniqueConstraint(
+            name = "uk_user_firebase_uid",
+            columnNames = ["firebase_uid"]
+        ),
+        UniqueConstraint(
+            name = "uk_user_email",
+            columnNames = ["email"]
+        )
+    ]
+)
 class UserEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

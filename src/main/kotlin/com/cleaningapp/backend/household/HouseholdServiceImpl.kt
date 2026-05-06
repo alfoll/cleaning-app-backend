@@ -140,6 +140,7 @@ class HouseholdServiceImpl(
 
 
     // полное удаление хозяйства (жесткое удаление транзакций потом активности + задач + привилегий)
+    // вызов только после блокировки household и userHousehold
     private fun deleteHouseholdInternal(household: HouseholdEntity) {
         // деактивировать хозяйство
         household.isActive = false

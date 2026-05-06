@@ -17,6 +17,7 @@ import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.OneToOne
 import jakarta.persistence.Table
+import jakarta.persistence.UniqueConstraint
 import org.hibernate.annotations.CreationTimestamp
 import java.time.LocalDateTime
 import java.util.UUID
@@ -39,6 +40,16 @@ import java.util.UUID
         Index(
             name = "idx_transaction_leaderboard",
             columnList = "household_id, type, member_id, created_at"
+        )
+    ],
+    uniqueConstraints = [
+        UniqueConstraint(
+            name = "uk_transaction_task_id",
+            columnNames = ["task_id"]
+        ),
+        UniqueConstraint(
+            name = "uk_transaction_privilege_id",
+            columnNames = ["privilege_id"]
         )
     ]
 )
