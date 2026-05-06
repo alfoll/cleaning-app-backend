@@ -323,4 +323,40 @@ class TestDataFactoryIntegrationTest() : BaseIntegrationTest() {
             )
         }.isInstanceOf(IllegalArgumentException::class.java)
     }
+
+    @Test
+    fun `factory should reject negative membership balance`() {
+        assertThatThrownBy {
+            testDataFactory.createTestMembership(balance = -1)
+        }.isInstanceOf(IllegalArgumentException::class.java)
+    }
+
+    @Test
+    fun `factory should reject task reward outside database range`() {
+        val user = testDataFactory.createTestUser()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+
+        assertThatThrownBy {
+            testDataFactory.createTestFreeTask(
+                household = household,
+                createdBy = user,
+                reward = 4,
+            )
+        }.isInstanceOf(IllegalArgumentException::class.java)
+    }
+
+    @Test
+    fun `factory should reject privilege state inconsistent with database constraints`() {
+        val user = testDataFactory.createTestUser()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+
+        assertThatThrownBy {
+            testDataFactory.createTestPrivilege(
+                household = household,
+                createdBy = user,
+                isAvailable = false,
+                boughtBy = null,
+            )
+        }.isInstanceOf(IllegalArgumentException::class.java)
+    }
 }

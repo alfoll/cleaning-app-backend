@@ -308,33 +308,6 @@ class TransactionServiceIntegrationTest : BaseIntegrationTest() {
     }
 
     @Test
-    fun `recordTaskCompletion should reject non positive reward`() {
-        val user = createLocalUserForValidToken()
-        val household = testDataFactory.createTestHousehold(createdBy = user)
-        val member = testDataFactory.createTestMembership(
-            user = user,
-            household = household,
-        )
-
-        val task = testDataFactory.createTestCompletedTask(
-            household = household,
-            createdBy = user,
-            completedBy = member,
-            reward = 0,
-        )
-
-        assertThatThrownBy {
-            transactionService.recordTaskCompletion(
-                TaskCompletionTransactionCommand(
-                    householdId = household.id!!,
-                    memberId = member.id!!,
-                    taskId = task.id!!,
-                )
-            )
-        }.isInstanceOf(BusinessConflictException::class.java)
-    }
-
-    @Test
     fun `recordTaskCompletion should reject duplicate task transaction and not increase balance again`() {
         val user = createLocalUserForValidToken()
         val household = testDataFactory.createTestHousehold(createdBy = user)
@@ -682,35 +655,6 @@ class TransactionServiceIntegrationTest : BaseIntegrationTest() {
     }
 
     @Test
-    fun `recordPrivilegePurchase should reject non positive cost`() {
-        val user = createLocalUserForValidToken()
-        val household = testDataFactory.createTestHousehold(createdBy = user)
-        val member = testDataFactory.createTestMembership(
-            user = user,
-            household = household,
-            balance = 100,
-        )
-
-        val privilege = testDataFactory.createTestPrivilege(
-            household = household,
-            createdBy = user,
-            cost = 0,
-            isAvailable = false,
-            boughtBy = member,
-        )
-
-        assertThatThrownBy {
-            transactionService.recordPrivilegePurchase(
-                PrivilegePurchaseTransactionCommand(
-                    householdId = household.id!!,
-                    memberId = member.id!!,
-                    privilegeId = privilege.id!!,
-                )
-            )
-        }.isInstanceOf(BusinessConflictException::class.java)
-    }
-
-    @Test
     fun `recordPrivilegePurchase should reject insufficient balance`() {
         val user = createLocalUserForValidToken()
         val household = testDataFactory.createTestHousehold(createdBy = user)
@@ -976,26 +920,6 @@ class TransactionServiceIntegrationTest : BaseIntegrationTest() {
                 )
             )
         }.isInstanceOf(MembershipNotFoundException::class.java)
-    }
-
-    @Test
-    fun `resetBalance should reject negative balance`() {
-        val user = createLocalUserForValidToken()
-        val household = testDataFactory.createTestHousehold(createdBy = user)
-        val member = testDataFactory.createTestMembership(
-            user = user,
-            household = household,
-            balance = -10,
-        )
-
-        assertThatThrownBy {
-            transactionService.resetBalance(
-                BalanceResetTransactionCommand(
-                    householdId = household.id!!,
-                    memberId = member.id!!,
-                )
-            )
-        }.isInstanceOf(BusinessConflictException::class.java)
     }
 
     @Test

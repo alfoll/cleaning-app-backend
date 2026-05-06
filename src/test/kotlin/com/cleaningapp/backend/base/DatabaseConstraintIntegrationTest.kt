@@ -1,7 +1,11 @@
 package com.cleaningapp.backend.base
 
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
+import org.springframework.dao.DataIntegrityViolationException
+import java.time.LocalDateTime
+import java.util.UUID
 
 class DatabaseConstraintIntegrationTest : BaseConcurrencyIntegrationTest() {
 
@@ -44,6 +48,219 @@ class DatabaseConstraintIntegrationTest : BaseConcurrencyIntegrationTest() {
             tableName = "transaction",
             columns = listOf("privilege_id"),
         )
+    }
+
+    @Test
+    fun `database should reject negative membership balance`() {
+        val user = testDataFactory.createTestUser()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+
+        assertConstraintViolation("ck_user_household_balance_non_negative") {
+            jdbcTemplate.update(
+                """
+                insert into user_household (
+                    id, user_id, household_id, balance, joined_at, is_user_active, version
+                ) values (?, ?, ?, ?, ?, ?, ?)
+                """.trimIndent(),
+                UUID.randomUUID(),
+                user.id!!,
+                household.id!!,
+                -1,
+                LocalDateTime.now(),
+                true,
+                0L,
+            )
+        }
+    }
+
+    @Test
+    fun `database should reject task reward outside allowed range`() {
+        val user = testDataFactory.createTestUser()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+
+        assertConstraintViolation("ck_task_reward_range") {
+            jdbcTemplate.update(
+                """
+                insert into task (
+                    id, household_id, created_by, created_at, title, description,
+                    reward, assigned_to, assigned_at, is_completed, completed_by, completed_at, version
+                ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """.trimIndent(),
+                UUID.randomUUID(),
+                household.id!!,
+                user.id!!,
+                LocalDateTime.now(),
+                "Invalid task",
+                "Invalid reward",
+                4,
+                null,
+                null,
+                false,
+                null,
+                null,
+                0L,
+            )
+        }
+    }
+
+    @Test
+    fun `database should reject task assignment inconsistency`() {
+        val user = testDataFactory.createTestUser()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+        val member = testDataFactory.createTestMembership(user = user, household = household)
+
+        assertConstraintViolation("ck_task_state_consistency") {
+            jdbcTemplate.update(
+                """
+                insert into task (
+                    id, household_id, created_by, created_at, title, description,
+                    reward, assigned_to, assigned_at, is_completed, completed_by, completed_at, version
+                ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """.trimIndent(),
+                UUID.randomUUID(),
+                household.id!!,
+                user.id!!,
+                LocalDateTime.now(),
+                "Invalid task",
+                "Missing assignedAt",
+                20,
+                member.id!!,
+                null,
+                false,
+                null,
+                null,
+                0L,
+            )
+        }
+    }
+
+    @Test
+    fun `database should reject task completion inconsistency`() {
+        val user = testDataFactory.createTestUser()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+
+        assertConstraintViolation("ck_task_state_consistency") {
+            jdbcTemplate.update(
+                """
+                insert into task (
+                    id, household_id, created_by, created_at, title, description,
+                    reward, assigned_to, assigned_at, is_completed, completed_by, completed_at, version
+                ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """.trimIndent(),
+                UUID.randomUUID(),
+                household.id!!,
+                user.id!!,
+                LocalDateTime.now(),
+                "Invalid task",
+                "Completed without performer",
+                20,
+                null,
+                null,
+                true,
+                null,
+                null,
+                0L,
+            )
+        }
+    }
+
+    @Test
+    fun `database should reject privilege cost outside allowed range`() {
+        val user = testDataFactory.createTestUser()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+
+        assertConstraintViolation("ck_privilege_cost_range") {
+            jdbcTemplate.update(
+                """
+                insert into privilege (
+                    id, household_id, created_by, created_at, title, description,
+                    cost, is_available, bought_by, version
+                ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """.trimIndent(),
+                UUID.randomUUID(),
+                household.id!!,
+                user.id!!,
+                LocalDateTime.now(),
+                "Invalid privilege",
+                "Invalid cost",
+                0,
+                true,
+                null,
+                0L,
+            )
+        }
+    }
+
+    @Test
+    fun `database should reject privilege availability inconsistency`() {
+        val user = testDataFactory.createTestUser()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+
+        assertConstraintViolation("ck_privilege_availability_consistency") {
+            jdbcTemplate.update(
+                """
+                insert into privilege (
+                    id, household_id, created_by, created_at, title, description,
+                    cost, is_available, bought_by, version
+                ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """.trimIndent(),
+                UUID.randomUUID(),
+                household.id!!,
+                user.id!!,
+                LocalDateTime.now(),
+                "Invalid privilege",
+                "Unavailable without buyer",
+                50,
+                false,
+                null,
+                0L,
+            )
+        }
+    }
+
+    @Test
+    fun `database should reject transaction payload inconsistent with type`() {
+        val user = testDataFactory.createTestUser()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+        val member = testDataFactory.createTestMembership(
+            user = user,
+            household = household,
+            balance = 100,
+        )
+        val privilege = testDataFactory.createTestPrivilege(
+            household = household,
+            createdBy = user,
+            cost = 50,
+            isAvailable = false,
+            boughtBy = member,
+        )
+
+        assertConstraintViolation("ck_transaction_payload_by_type") {
+            jdbcTemplate.update(
+                """
+                insert into "transaction" (
+                    id, household_id, member_id, amount, created_at, type, task_id, privilege_id
+                ) values (?, ?, ?, ?, ?, ?, ?, ?)
+                """.trimIndent(),
+                UUID.randomUUID(),
+                household.id!!,
+                member.id!!,
+                10,
+                LocalDateTime.now(),
+                "TASK_COMPLETION",
+                null,
+                privilege.id!!,
+            )
+        }
+    }
+
+    private fun assertConstraintViolation(
+        constraintName: String,
+        block: () -> Unit,
+    ) {
+        assertThatThrownBy(block)
+            .isInstanceOf(DataIntegrityViolationException::class.java)
+            .hasMessageContaining(constraintName)
     }
 
     private fun loadUniqueConstraints(): List<UniqueConstraintInfo> {

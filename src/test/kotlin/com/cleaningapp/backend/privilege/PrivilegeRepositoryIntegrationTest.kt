@@ -76,14 +76,6 @@ class PrivilegeRepositoryIntegrationTest : BaseIntegrationTest() {
             boughtBy = otherMembership,
         )
 
-        val inconsistentUnavailableWithoutBuyer = testDataFactory.createTestPrivilege(
-            household = household,
-            createdBy = currentUser,
-            title = "Unavailable without buyer",
-            isAvailable = false,
-            boughtBy = null,
-        )
-
         val otherHouseholdPrivilege = testDataFactory.createTestPrivilege(
             household = otherHousehold,
             createdBy = currentUser,
@@ -113,10 +105,6 @@ class PrivilegeRepositoryIntegrationTest : BaseIntegrationTest() {
             createdAt = baseTime.minusDays(3),
         )
         testDataFactory.updatePrivilegeCreatedAt(
-            privilegeId = inconsistentUnavailableWithoutBuyer.id!!,
-            createdAt = baseTime.minusDays(4),
-        )
-        testDataFactory.updatePrivilegeCreatedAt(
             privilegeId = otherHouseholdPrivilege.id!!,
             createdAt = baseTime.plusDays(1),
         )
@@ -137,7 +125,6 @@ class PrivilegeRepositoryIntegrationTest : BaseIntegrationTest() {
                 newerAvailablePrivilege.id,
                 newerBoughtByCurrent.id,
                 boughtByOther.id,
-                inconsistentUnavailableWithoutBuyer.id,
                 olderBoughtByCurrent.id,
                 olderAvailablePrivilege.id,
             )

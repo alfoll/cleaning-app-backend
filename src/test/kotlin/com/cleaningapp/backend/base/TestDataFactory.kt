@@ -126,6 +126,9 @@ class TestDataFactory(
         balance: Int = 0,
         isUserActive: Boolean = true,
     ): UserHouseholdEntity {
+        require(balance >= 0) {
+            "balance must be non-negative"
+        }
 
         val membership = UserHouseholdEntity(
             balance = balance,
@@ -174,6 +177,10 @@ class TestDataFactory(
 
         require(!isCompleted || assignedTo == null) {
             "Completed task must not stay assigned"
+        }
+
+        require(reward in 5..100) {
+            "reward must be between 5 and 100"
         }
 
         val task = TaskEntity(
@@ -268,6 +275,12 @@ class TestDataFactory(
     ): PrivilegeEntity {
 
         requireSameHousehold(household, boughtBy)
+        require(cost in 5..500) {
+            "cost must be between 5 and 500"
+        }
+        require((isAvailable && boughtBy == null) || (!isAvailable && boughtBy != null)) {
+            "Privilege availability and boughtBy must be consistent"
+        }
 
         val privilege = PrivilegeEntity(
             title = title,
