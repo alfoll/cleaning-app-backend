@@ -29,16 +29,12 @@ dependencies {
     // для моккирования
     mockitoAgent("org.mockito:mockito-core:5.18.0")
 
-
+    // аутентификация
     implementation("com.google.firebase:firebase-admin:9.7.1")
+    implementation("org.springframework.boot:spring-boot-starter-security")
 
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-liquibase")
-
-    implementation("org.springframework.boot:spring-boot-starter-security")
-    implementation("io.jsonwebtoken:jjwt-api:0.12.3")
-    implementation("io.jsonwebtoken:jjwt-impl:0.12.3") // было runtimeOnly
-    implementation("io.jsonwebtoken:jjwt-jackson:0.12.3") // было runtimeOnly
 
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
@@ -46,14 +42,10 @@ dependencies {
     implementation("tools.jackson.module:jackson-module-kotlin")
     developmentOnly("org.springframework.boot:spring-boot-devtools")
 
-// dev
-    runtimeOnly("com.h2database:h2")
-    implementation("org.springframework.boot:spring-boot-h2console")
-// prod
+    // dev + prod
     runtimeOnly("org.postgresql:postgresql")
 
-    // implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.x.x")
-    implementation("org.springdoc:springdoc-openapi-ui:1.7.0") // API-контракт]
+    implementation("org.springdoc:springdoc-openapi-ui:1.7.0") // API-контракт
 
 
     testImplementation("org.springframework.boot:spring-boot-starter-data-jpa-test")
@@ -74,11 +66,6 @@ kotlin {
         )
     }
 }
-// kotlin {
-//     compilerOptions {
-//         freeCompilerArgs.addAll("-Xjsr305=strict", "-Xannotation-default-target=param-property")
-//     }
-// }
 
 allOpen {
     annotation("jakarta.persistence.Entity")
@@ -88,5 +75,4 @@ allOpen {
 
 tasks.withType<Test> {
     useJUnitPlatform()
-//    jvmArgs("-javaagent:${mockitoAgent.asPath}")
 }
