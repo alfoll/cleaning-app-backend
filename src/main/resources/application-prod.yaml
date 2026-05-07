@@ -9,8 +9,12 @@ spring:
     show-sql: false
     properties:
       hibernate:
-        format_sql: true
+        format_sql: false
         jdbc.lob.non_contextual_creation: true
+
+  h2:
+    console:
+      enabled: false
 
 firebase:
   admin:

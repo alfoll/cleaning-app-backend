@@ -11,6 +11,9 @@ spring:
       ddl-auto: validate
     open-in-view: false
 
+server:
+  port: ${PORT:8080}
+
 firebase:
   admin:
     enabled: true
