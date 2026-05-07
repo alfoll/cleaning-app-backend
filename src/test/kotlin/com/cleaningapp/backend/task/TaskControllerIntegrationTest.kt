@@ -22,6 +22,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import java.time.LocalDateTime
 import java.util.UUID
 
 class TaskControllerIntegrationTest : BaseIntegrationTest() {
@@ -203,6 +204,40 @@ class TaskControllerIntegrationTest : BaseIntegrationTest() {
             .andExpect(jsonPath("$[0].id").value(freeTask.id.toString()))
             .andExpect(jsonPath("$[0].isAssigned").value(false))
             .andExpect(jsonPath("$[0].isCompleted").value(false))
+    }
+
+    @Test
+    fun `get household tasks FREE should return at most 150 newest tasks`() {
+        val user = createLocalUserForValidToken()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+        testDataFactory.createTestMembership(user = user, household = household)
+
+        val baseTime = LocalDateTime.parse("2026-04-27T12:00:00")
+
+        val tasks = (1..151).map { index ->
+            val task = testDataFactory.createTestFreeTask(
+                household = household,
+                createdBy = user,
+                reward = 20,
+            )
+
+            testDataFactory.updateTaskTimestamps(
+                taskId = task.id!!,
+                createdAt = baseTime.plusMinutes(index.toLong()),
+            )
+
+            task
+        }
+
+        mockMvc.perform(
+            get("/api/households/${household.id}/tasks")
+                .param("filter", "FREE")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $validToken")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.length()").value(150))
+            .andExpect(jsonPath("$[0].id").value(tasks.last().id.toString()))
+            .andExpect(jsonPath("$[149].id").value(tasks[1].id.toString()))
     }
 
     @Test

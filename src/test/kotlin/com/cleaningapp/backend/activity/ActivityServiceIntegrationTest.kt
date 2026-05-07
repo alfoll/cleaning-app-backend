@@ -267,6 +267,47 @@ class ActivityServiceIntegrationTest : BaseIntegrationTest() {
     }
 
     @Test
+    fun `getHouseholdActivity should return at most 150 newest activities`() {
+        val user = createLocalUserForValidToken()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+        val membership = testDataFactory.createTestMembership(
+            user = user,
+            household = household,
+        )
+
+        val baseTime = LocalDateTime.parse("2026-04-27T12:00:00")
+
+        val activities = (1..151).map { index ->
+            val activity = testDataFactory.createTestActivity(
+                household = household,
+                member = membership,
+                activityType = ActivityType.TASK_CREATED,
+                title = "Activity $index",
+            )
+
+            testDataFactory.updateActivityCreatedAt(
+                activityId = activity.id!!,
+                createdAt = baseTime.plusMinutes(index.toLong()),
+            )
+
+            activity
+        }
+
+        authenticateAs()
+
+        val result = activityService.getHouseholdActivity(
+            householdId = household.id!!,
+            activityType = null,
+            actorScope = ActivityActorScope.ALL,
+        )
+
+        assertThat(result).hasSize(150)
+        assertThat(result.first().id).isEqualTo(activities.last().id)
+        assertThat(result.last().id).isEqualTo(activities[1].id)
+        assertThat(result.map { it.id }).doesNotContain(activities.first().id)
+    }
+
+    @Test
     fun `getHouseholdActivity should filter by activity type with ALL actor scope`() {
         val user = createLocalUserForValidToken()
         val otherUser = testDataFactory.createTestUser()

@@ -19,6 +19,8 @@ import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
+import org.springframework.data.domain.PageRequest
+
 
 enum class ActivityActorScope{
     ALL, // вся активность хозяйства
@@ -33,6 +35,12 @@ class ActivityServiceImpl(
     private val householdRepository: HouseholdRepository,
     private val userHouseholdRepository: UserHouseholdRepository,
 ): ActivityService {
+
+    // лимит записей на выдачу
+    private companion object {
+        const val ACTIVITY_FEED_LIMIT = 150
+    }
+
 
     // достать юзера из контекста
     private fun getCurrentUser(): UserEntity {
@@ -143,34 +151,41 @@ class ActivityServiceImpl(
         // достать АКТИВНОЕ участие
         val membership = getActiveMembership(user.id!!, household.id!!)
 
+        // лимит выдачи
+        val firstPage = PageRequest.of(0, ACTIVITY_FEED_LIMIT)
+
         // получить ленту активности с фильтрацией
         val activities = when {
             // вся лента (нет фильтра по типу активности + ALL на фильтре по участнику)
             activityType == null && actorScope == ActivityActorScope.ALL ->
                 activityRepository.findAllByHouseholdIdOrderByCreatedAtDesc(
-                    household.id!!
+                    householdId = household.id!!,
+                    pageable = firstPage
                 )
 
             // лента по типам активности (фильтр по типу акти вности + ALL на фильтре по участнику)
             activityType != null && actorScope == ActivityActorScope.ALL ->
                 activityRepository.findAllByHouseholdIdAndActivityTypeOrderByCreatedAtDesc(
-                    household.id!!,
-                    activityType
+                    householdId = household.id!!,
+                    activityType = activityType,
+                    pageable = firstPage
                 )
 
             // вся лента участника (нет фильтра по типу активности + MY на фильтре по участнику)
             activityType == null && actorScope == ActivityActorScope.MY ->
                 activityRepository.findAllByHouseholdIdAndMemberIdOrderByCreatedAtDesc(
-                    household.id!!,
-                    membership.id!! // фильтрует по id у UserHousehold а не у User
+                    householdId = household.id!!,
+                    memberId = membership.id!!, // фильтрует по id у UserHousehold а не у User
+                    pageable = firstPage
                 )
 
             // моя активность + фильтрация по типу (двойной фильтр)
             else ->
                 activityRepository.findAllByHouseholdIdAndActivityTypeAndMemberIdOrderByCreatedAtDesc(
-                    household.id!!,
-                    activityType!!,
-                    membership.id!! // фильтрует по id у UserHousehold а не у User
+                    householdId = household.id!!,
+                    activityType = activityType!!,
+                    memberId = membership.id!!, // фильтрует по id у UserHousehold а не у User
+                    pageable = firstPage
                 )
         }
 

@@ -19,6 +19,7 @@ import com.cleaningapp.backend.user.UserEntity
 import com.cleaningapp.backend.user.UserRepository
 import com.cleaningapp.backend.userhousehold.UserHouseholdEntity
 import com.cleaningapp.backend.userhousehold.UserHouseholdRepository
+import org.springframework.data.domain.PageRequest
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.security.access.AccessDeniedException
 import org.springframework.security.core.context.SecurityContextHolder
@@ -36,6 +37,13 @@ class TransactionServiceImpl(
     private val taskRepository: TaskRepository,
     private val privilegeRepository: PrivilegeRepository,
 ): TransactionService {
+
+    // лимит записей на выдачу
+    private companion object {
+        const val TRANSACTION_HISTORY_LIMIT = 150
+    }
+
+
 
     // достать юзера из контекста
     // для публичных методов чтения транзакций пользователя
@@ -314,11 +322,15 @@ class TransactionServiceImpl(
         // валидировать участие
         val membership = getActiveMembership(user.id!!, household.id!!)
 
+        // страница с лимитом выдаи
+        val firstPage = PageRequest.of(0, TRANSACTION_HISTORY_LIMIT)
+
         // достать историю транзакций участника
         return transactionRepository
             .findAllByHouseholdIdAndMemberIdOrderByCreatedAtDesc(
-                household.id!!,
-                membership.id!!
+                householdId = household.id!!,
+                memberId = membership.id!!,
+                pageable = firstPage
             ).map { it.toDto() }
     }
 }

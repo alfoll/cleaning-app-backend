@@ -5,23 +5,62 @@ import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import java.util.UUID
+import org.springframework.data.domain.Pageable
+import org.springframework.data.jpa.repository.EntityGraph
+
 
 interface ActivityRepository: JpaRepository<ActivityEntity, UUID> {
 
     // вся активность
-    fun findAllByHouseholdIdOrderByCreatedAtDesc(householdId: UUID): List<ActivityEntity>
+    fun findAllByHouseholdIdOrderByCreatedAtDesc(
+        householdId: UUID
+    ): List<ActivityEntity>
+    // Pageable
+    @EntityGraph(attributePaths = ["member", "member.user"])
+    fun findAllByHouseholdIdOrderByCreatedAtDesc(
+        householdId: UUID,
+        pageable: Pageable,
+    ): List<ActivityEntity>
 
     // активность с фильтром по типу
-    fun findAllByHouseholdIdAndActivityTypeOrderByCreatedAtDesc(householdId: UUID, activityType: ActivityType): List<ActivityEntity>
+    fun findAllByHouseholdIdAndActivityTypeOrderByCreatedAtDesc(
+        householdId: UUID,
+        activityType: ActivityType
+    ): List<ActivityEntity>
+    // Pageable
+    @EntityGraph(attributePaths = ["member", "member.user"])
+    fun findAllByHouseholdIdAndActivityTypeOrderByCreatedAtDesc(
+        householdId: UUID,
+        activityType: ActivityType,
+        pageable: Pageable,
+    ): List<ActivityEntity>
 
     // активность с фильтром по участнику
-    fun findAllByHouseholdIdAndMemberIdOrderByCreatedAtDesc(householdId: UUID, memberId: UUID): List<ActivityEntity>
+    fun findAllByHouseholdIdAndMemberIdOrderByCreatedAtDesc(
+        householdId: UUID,
+        memberId: UUID
+    ): List<ActivityEntity>
+    // Pageable
+    @EntityGraph(attributePaths = ["member", "member.user"])
+    fun findAllByHouseholdIdAndMemberIdOrderByCreatedAtDesc(
+        householdId: UUID,
+        memberId: UUID,
+        pageable: Pageable,
+    ): List<ActivityEntity>
 
     // активность с фильтром тип + участник - подумать, нужно ли вообще
     fun findAllByHouseholdIdAndActivityTypeAndMemberIdOrderByCreatedAtDesc(
         householdId: UUID,
         activityType: ActivityType,
         memberId: UUID,
+    ): List<ActivityEntity>
+    // Pageable
+    @EntityGraph(attributePaths = ["member", "member.user"])
+    fun findAllByHouseholdIdAndActivityTypeAndMemberIdOrderByCreatedAtDesc(
+        householdId: UUID,
+        activityType: ActivityType,
+        memberId: UUID,
+        pageable: Pageable,
     ): List<ActivityEntity>
 
     // bulk delete

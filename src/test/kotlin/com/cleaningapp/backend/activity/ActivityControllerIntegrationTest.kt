@@ -101,6 +101,43 @@ class ActivityControllerIntegrationTest : BaseIntegrationTest() {
     }
 
     @Test
+    fun `get household activity should return at most 150 newest activities`() {
+        val user = createLocalUserForValidToken()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+        val membership = testDataFactory.createTestMembership(
+            user = user,
+            household = household,
+        )
+
+        val baseTime = LocalDateTime.parse("2026-04-27T12:00:00")
+
+        val activities = (1..151).map { index ->
+            val activity = testDataFactory.createTestActivity(
+                household = household,
+                member = membership,
+                activityType = ActivityType.TASK_CREATED,
+                title = "Activity $index",
+            )
+
+            testDataFactory.updateActivityCreatedAt(
+                activityId = activity.id!!,
+                createdAt = baseTime.plusMinutes(index.toLong()),
+            )
+
+            activity
+        }
+
+        mockMvc.perform(
+            get("/api/households/${household.id}/activity")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $validToken")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.length()").value(150))
+            .andExpect(jsonPath("$[0].id").value(activities.last().id.toString()))
+            .andExpect(jsonPath("$[149].id").value(activities[1].id.toString()))
+    }
+
+    @Test
     fun `get household activity should filter by activity type`() {
         val user = createLocalUserForValidToken()
         val otherUser = testDataFactory.createTestUser()

@@ -19,6 +19,7 @@ import com.cleaningapp.backend.user.UserEntity
 import com.cleaningapp.backend.user.UserRepository
 import com.cleaningapp.backend.userhousehold.UserHouseholdEntity
 import com.cleaningapp.backend.userhousehold.UserHouseholdRepository
+import org.springframework.data.domain.PageRequest
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.security.access.AccessDeniedException
 import org.springframework.security.core.context.SecurityContextHolder
@@ -45,6 +46,13 @@ class TaskServiceImpl(
     private val transactionService: TransactionService,
     private val activityService: ActivityService,
 ): TaskService {
+
+    // лимиты на выдачу фронту (ALL без лимита)
+    private companion object {
+        const val COMPLETED_TASK_LIMIT = 150
+        const val MY_TASK_LIMIT = 150
+        const val FREE_TASK_LIMIT = 150
+    }
 
     // достать юзера из контекста
     private fun getCurrentUser(): UserEntity {
@@ -414,22 +422,32 @@ class TaskServiceImpl(
         // достать активное участие
         val membership = getActiveMembership(user.id!!, household.id!!)
 
+
         // сформировать список задач по запросу фильтра
         val tasks = when (filter) {
-            TaskFilterType.ALL -> // все
-                taskRepository.findAllByHouseholdIdOrderByCreatedAtDesc(household.id!!)
+            TaskFilterType.ALL -> // все - считаются без лимита
+                taskRepository.findAllByHouseholdIdOrderByCreatedAtDesc(
+                    householdId = household.id!!
+                )
 
             TaskFilterType.FREE -> // все не заброненные и не выполненные
-                taskRepository.findAllByHouseholdIdAndAssignedToIsNullAndIsCompletedFalseOrderByCreatedAtDesc(household.id!!)
+                taskRepository.findAllByHouseholdIdAndAssignedToIsNullAndIsCompletedFalseOrderByCreatedAtDesc(
+                    householdId = household.id!!,
+                    pageable = PageRequest.of(0, FREE_TASK_LIMIT)
+                )
 
             TaskFilterType.MY -> // мои заброненные - через участие а не через юзера
                 taskRepository.findAllByHouseholdIdAndAssignedToIdAndIsCompletedFalseOrderByAssignedAtDesc(
-                    household.id!!,
-                    membership.id!!
+                    householdId = household.id!!,
+                    assignedToId = membership.id!!,
+                    pageable = PageRequest.of(0, MY_TASK_LIMIT)
                 )
 
             TaskFilterType.COMPLETED -> // все выполненные
-                taskRepository.findAllByHouseholdIdAndIsCompletedTrueOrderByCompletedAtDesc(household.id!!)
+                taskRepository.findAllByHouseholdIdAndIsCompletedTrueOrderByCompletedAtDesc(
+                    householdId = household.id!!,
+                    pageable = PageRequest.of(0, COMPLETED_TASK_LIMIT)
+                )
         }
 
         return tasks.map { it.toDto() }

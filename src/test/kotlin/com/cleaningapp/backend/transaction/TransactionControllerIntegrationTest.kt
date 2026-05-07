@@ -108,6 +108,37 @@ class TransactionControllerIntegrationTest : BaseIntegrationTest() {
     }
 
     @Test
+    fun `get my transactions should return at most 150 newest transactions`() {
+        val user = createLocalUserForValidToken()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+        val member = testDataFactory.createTestMembership(
+            user = user,
+            household = household,
+            balance = 100,
+        )
+
+        val baseTime = LocalDateTime.parse("2026-04-27T12:00:00")
+
+        val transactions = (1..151).map { index ->
+            testDataFactory.createTestBalanceResetTransaction(
+                household = household,
+                member = member,
+                amount = -index,
+                createdAt = baseTime.plusMinutes(index.toLong()),
+            )
+        }
+
+        mockMvc.perform(
+            get("/api/households/${household.id}/transactions/my")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $validToken")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.length()").value(150))
+            .andExpect(jsonPath("$[0].id").value(transactions.last().id.toString()))
+            .andExpect(jsonPath("$[149].id").value(transactions[1].id.toString()))
+    }
+
+    @Test
     fun `get my transactions should return empty list when current member has no transactions`() {
         val user = createLocalUserForValidToken()
         val household = testDataFactory.createTestHousehold(createdBy = user)

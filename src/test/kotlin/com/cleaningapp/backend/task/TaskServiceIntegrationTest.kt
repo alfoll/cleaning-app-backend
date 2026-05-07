@@ -1115,4 +1115,40 @@ class TaskServiceIntegrationTest : BaseIntegrationTest() {
                 olderCompletedTask.id,
             )
     }
+
+    @Test
+    fun `getHouseholdTasks FREE should return at most 150 newest tasks`() {
+        val user = createLocalUserForValidToken()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+        testDataFactory.createTestMembership(
+            user = user,
+            household = household,
+        )
+
+        val baseTime = LocalDateTime.parse("2026-04-27T12:00:00")
+
+        val tasks = (1..151).map { index ->
+            val task = testDataFactory.createTestFreeTask(
+                household = household,
+                createdBy = user,
+                reward = 20,
+            )
+
+            testDataFactory.updateTaskTimestamps(
+                taskId = task.id!!,
+                createdAt = baseTime.plusMinutes(index.toLong()),
+            )
+
+            task
+        }
+
+        authenticateAs()
+
+        val result = taskService.getHouseholdTasks(household.id!!, TaskFilterType.FREE)
+
+        assertThat(result).hasSize(150)
+        assertThat(result.first().id).isEqualTo(tasks.last().id)
+        assertThat(result.last().id).isEqualTo(tasks[1].id)
+        assertThat(result.map { it.id }).doesNotContain(tasks.first().id)
+    }
 }

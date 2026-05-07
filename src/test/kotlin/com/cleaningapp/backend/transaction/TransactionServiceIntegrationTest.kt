@@ -1036,6 +1036,37 @@ class TransactionServiceIntegrationTest : BaseIntegrationTest() {
     }
 
     @Test
+    fun `getMyTransactions should return at most 150 newest transactions`() {
+        val user = createLocalUserForValidToken()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+        val member = testDataFactory.createTestMembership(
+            user = user,
+            household = household,
+            balance = 100,
+        )
+
+        val baseTime = LocalDateTime.parse("2026-04-27T12:00:00")
+
+        val transactions = (1..151).map { index ->
+            testDataFactory.createTestBalanceResetTransaction(
+                household = household,
+                member = member,
+                amount = -index,
+                createdAt = baseTime.plusMinutes(index.toLong()),
+            )
+        }
+
+        authenticateAs()
+
+        val result = transactionService.getMyTransactions(household.id!!)
+
+        assertThat(result).hasSize(150)
+        assertThat(result.first().id).isEqualTo(transactions.last().id)
+        assertThat(result.last().id).isEqualTo(transactions[1].id)
+        assertThat(result.map { it.id }).doesNotContain(transactions.first().id)
+    }
+
+    @Test
     fun `getMyTransactions should return empty list when current member has no transactions`() {
         val user = createLocalUserForValidToken()
         val household = testDataFactory.createTestHousehold(createdBy = user)

@@ -7,13 +7,50 @@ import org.springframework.data.repository.query.Param
 import java.util.UUID
 import jakarta.persistence.LockModeType
 import org.springframework.data.jpa.repository.Lock
+import org.springframework.data.domain.Pageable
+import org.springframework.data.jpa.repository.EntityGraph
 
 interface TaskRepository: JpaRepository<TaskEntity, UUID> {
+
     // задачи хозяйства (сорт по созданию сначалп последние)
-    fun findAllByHouseholdIdOrderByCreatedAtDesc(householdId: UUID): List<TaskEntity>
+    fun findAllByHouseholdIdOrderByCreatedAtDesc(
+        householdId: UUID
+    ): List<TaskEntity>
+    // Pageable
+    @EntityGraph(
+        attributePaths = [
+            "createdBy",
+            "assignedTo",
+            "assignedTo.user",
+            "completedBy",
+            "completedBy.user"
+        ]
+    )
+    fun findAllByHouseholdIdOrderByCreatedAtDesc(
+        householdId: UUID,
+        pageable: Pageable,
+    ): List<TaskEntity>
+
 
     // выполненные и не выполненные задачи хозяйства (сорт по выполнению - сначала последние)
-    fun findAllByHouseholdIdAndIsCompletedTrueOrderByCompletedAtDesc(householdId: UUID): List<TaskEntity>
+    fun findAllByHouseholdIdAndIsCompletedTrueOrderByCompletedAtDesc(
+        householdId: UUID
+    ): List<TaskEntity>
+    // Pageable
+    @EntityGraph(
+        attributePaths = [
+            "createdBy",
+            "assignedTo",
+            "assignedTo.user",
+            "completedBy",
+            "completedBy.user"
+        ]
+    )
+    fun findAllByHouseholdIdAndIsCompletedTrueOrderByCompletedAtDesc(
+        householdId: UUID,
+        pageable: Pageable,
+    ): List<TaskEntity>
+
 
     // чтобы освобождать забронированные невыполненные задачи (сорт не нужен - внуренний метод)
     // МОИ забронированные и не выполненные - зачем если есть следующий метод? - для освобождения по всем хозяйствам
@@ -24,11 +61,42 @@ interface TaskRepository: JpaRepository<TaskEntity, UUID> {
         householdId: UUID,
         assignedToId: UUID
     ): List<TaskEntity>
+    // Pageable
+    @EntityGraph(
+        attributePaths = [
+            "createdBy",
+            "assignedTo",
+            "assignedTo.user",
+            "completedBy",
+            "completedBy.user"
+        ]
+    )
+    fun findAllByHouseholdIdAndAssignedToIdAndIsCompletedFalseOrderByAssignedAtDesc(
+        householdId: UUID,
+        assignedToId: UUID,
+        pageable: Pageable,
+    ): List<TaskEntity>
+
 
     // не забронированные и не выполненные - свободные задачи (сорт по созданию - сначала последние)
     fun findAllByHouseholdIdAndAssignedToIsNullAndIsCompletedFalseOrderByCreatedAtDesc(
         householdId: UUID
     ): List<TaskEntity>
+    // Pageable
+    @EntityGraph(
+        attributePaths = [
+            "createdBy",
+            "assignedTo",
+            "assignedTo.user",
+            "completedBy",
+            "completedBy.user"
+        ]
+    )
+    fun findAllByHouseholdIdAndAssignedToIsNullAndIsCompletedFalseOrderByCreatedAtDesc(
+        householdId: UUID,
+        pageable: Pageable,
+    ): List<TaskEntity>
+
 
     // bulk delete
     @Modifying(flushAutomatically = true, clearAutomatically = false)
