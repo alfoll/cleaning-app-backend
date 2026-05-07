@@ -27,8 +27,6 @@ out/
 !**/src/test/**/out/
 *.json
 adminsdk-service-account-key.json
-*.yaml
-application*.yaml
 
 
 ### NetBeans ###
@@ -43,3 +41,12 @@ application*.yaml
 
 ### Kotlin ###
 .kotlin
+
+
+### окружение
+.env
+.env.*
+!.env.example
+!.env.dev.example
+!.env.test.example
+!.env.prod.example

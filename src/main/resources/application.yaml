@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: cleaning-app
+
+  liquibase:
+    enabled: true
+    change-log: classpath:/db/changelog/db.changelog-master.yaml
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+
+firebase:
+  admin:
+    enabled: true
+    key-path: ${FIREBASE_ADMIN_KEY_PATH}
+
+
+# application-dev.yaml (PostgreSQL)
+# application-prod.yaml (PostgreSQL)
+# application-test.yaml (PostgreSQL)
