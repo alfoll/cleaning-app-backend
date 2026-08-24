@@ -151,6 +151,7 @@ class TestDataFactory(
         title: String = "Test task",
         description: String? = "Test task description",
         reward: Int = 20,
+        dueAt: LocalDateTime? = null,
 
         assignedTo: UserHouseholdEntity? = null,
         assignedAt: LocalDateTime? = if (assignedTo != null) LocalDateTime.now(clock) else null,
@@ -187,6 +188,7 @@ class TestDataFactory(
             title = title,
             description = description,
             reward = reward,
+            dueAt = dueAt,
 
             assignedAt = assignedAt,
             isCompleted = isCompleted,

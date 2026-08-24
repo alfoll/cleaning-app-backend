@@ -12,6 +12,7 @@ data class TaskResponseDTO(
     val title: String,
     val description: String? = null,
     val reward: Int,
+    val dueAt: LocalDateTime?,
 
     val isAssigned: Boolean = false, // в сущности нет, только в дто для облегчения
     val assignedTo: UUID? = null, // в реальности UserHousehold.id, но тут отдается User.id

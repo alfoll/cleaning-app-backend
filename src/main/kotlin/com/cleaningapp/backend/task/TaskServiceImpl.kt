@@ -25,6 +25,8 @@ import org.springframework.security.access.AccessDeniedException
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Clock
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.util.UUID
 
@@ -45,6 +47,7 @@ class TaskServiceImpl(
 
     private val transactionService: TransactionService,
     private val activityService: ActivityService,
+    private val clock: Clock,
 ): TaskService {
 
     // лимиты на выдачу фронту (ALL без лимита)
@@ -128,6 +131,16 @@ class TaskServiceImpl(
         taskRepository.findByIdForUpdate(taskId)
             ?: throw TaskNotFoundException()
 
+    private fun normalizeDueAt(dueAt: LocalDateTime?): LocalDateTime? {
+        if (dueAt == null) return null
+
+        val dueDate = dueAt.toLocalDate()
+        if (dueDate.isBefore(LocalDate.now(clock)))
+            throw IllegalArgumentException("Task due date cannot be in the past")
+
+        return dueDate.atTime(23, 59, 59, 999_999_000)
+    }
+
     // проверить что пользователь состоит в хозяйстве в котором хочет взять задачу
     // только для read сценариев - для поддержания порядка блокировки
     private fun validateTaskAccess(task: TaskEntity, currentUser: UserEntity): UserHouseholdEntity {
@@ -149,7 +162,8 @@ class TaskServiceImpl(
         val membership = getActiveMembershipForUpdate(user.id!!, household.id!!)
 
         // сохраняем задачу
-        val savedTask = taskRepository.save(task.toTaskEntity(user, household))
+        val normalizedTask = task.copy(dueAt = normalizeDueAt(task.dueAt))
+        val savedTask = taskRepository.save(normalizedTask.toTaskEntity(user, household))
 
         // запись TASK_CREATED в ленту активности
         activityService.createActivityRecord(
@@ -199,6 +213,7 @@ class TaskServiceImpl(
         task.title = newTask.title
         task.description = newTask.description
         task.reward = newTask.reward
+        task.dueAt = normalizeDueAt(newTask.dueAt)
 
 //        return taskRepository.save(task).toDto() // managed entity
         return task.toDto()

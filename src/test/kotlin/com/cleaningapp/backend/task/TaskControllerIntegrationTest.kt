@@ -22,6 +22,8 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import java.time.Clock
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.util.UUID
 
@@ -41,6 +43,9 @@ class TaskControllerIntegrationTest : BaseIntegrationTest() {
 
     @Autowired
     private lateinit var activityRepository: ActivityRepository
+
+    @Autowired
+    private lateinit var clock: Clock
 
     enum class MissingTaskEndpoint {
         UPDATE,
@@ -115,6 +120,57 @@ class TaskControllerIntegrationTest : BaseIntegrationTest() {
         assertThat(activities.map { it.activityType }).contains(ActivityType.TASK_CREATED)
         assertThat(activities.first { it.activityType == ActivityType.TASK_CREATED }.member.id)
             .isEqualTo(membership.id)
+    }
+
+    @Test
+    fun `create task should accept and return normalized due date`() {
+        val user = createLocalUserForValidToken()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+        testDataFactory.createTestMembership(user = user, household = household)
+        val dueDate = LocalDate.now(clock).plusDays(2)
+
+        val requestBody = """
+            {
+              "title": "Deadline task",
+              "reward": 20,
+              "dueAt": "${dueDate}T12:30:00"
+            }
+        """.trimIndent()
+
+        mockMvc.perform(
+            post("/api/households/${household.id}/tasks")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $validToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBody)
+        )
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.dueAt").value("${dueDate}T23:59:59.999999"))
+    }
+
+    @Test
+    fun `create task should reject due date before today`() {
+        val user = createLocalUserForValidToken()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+        testDataFactory.createTestMembership(user = user, household = household)
+        val dueDate = LocalDate.now(clock).minusDays(1)
+
+        val requestBody = """
+            {
+              "title": "Past deadline task",
+              "reward": 20,
+              "dueAt": "${dueDate}T23:59:00"
+            }
+        """.trimIndent()
+
+        mockMvc.perform(
+            post("/api/households/${household.id}/tasks")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $validToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(requestBody)
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.error").value("400 ILLEGAL_ARGUMENT"))
+            .andExpect(jsonPath("$.message").value("Task due date cannot be in the past"))
     }
 
     @Test

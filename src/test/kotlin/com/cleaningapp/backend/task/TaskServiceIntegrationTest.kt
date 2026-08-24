@@ -20,6 +20,7 @@ import java.util.UUID
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
 import java.time.Clock
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.util.stream.Stream
 
@@ -95,6 +96,9 @@ class TaskServiceIntegrationTest : BaseIntegrationTest() {
         }
     }
 
+    private fun endOfDay(date: LocalDate): LocalDateTime =
+        date.atTime(23, 59, 59, 999_999_000)
+
 
     @Test
     fun `createTask should create task and activity for active household member`() {
@@ -127,6 +131,7 @@ class TaskServiceIntegrationTest : BaseIntegrationTest() {
         assertThat(result.title).isEqualTo("Wash dishes")
         assertThat(result.description).isEqualTo("Wash all dishes after dinner")
         assertThat(result.reward).isEqualTo(20)
+        assertThat(result.dueAt).isNull()
         assertThat(result.isAssigned).isFalse()
         assertThat(result.assignedTo).isNull()
         assertThat(result.isCompleted).isFalse()
@@ -136,11 +141,84 @@ class TaskServiceIntegrationTest : BaseIntegrationTest() {
         assertThat(savedTask.createdBy.id).isEqualTo(user.id)
         assertThat(savedTask.title).isEqualTo("Wash dishes")
         assertThat(savedTask.reward).isEqualTo(20)
+        assertThat(savedTask.dueAt).isNull()
 
         assertThat(activities.map { it.activityType })
             .contains(ActivityType.TASK_CREATED)
         assertThat(activities.first { it.activityType == ActivityType.TASK_CREATED }.member.id)
             .isEqualTo(membership.id)
+    }
+
+    @Test
+    fun `createTask should normalize future due date to end of day`() {
+        val user = createLocalUserForValidToken()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+        testDataFactory.createTestMembership(user = user, household = household)
+        val dueDate = LocalDate.now(clock).plusDays(3)
+
+        authenticateAs()
+
+        val result = taskService.createTask(
+            householdId = household.id!!,
+            task = TaskRegisterDTO(
+                title = "Future task",
+                reward = 20,
+                dueAt = dueDate.atTime(12, 30),
+            )
+        )
+
+        entityManager.flush()
+        entityManager.clear()
+
+        val savedTask = taskRepository.findById(result.id).orElseThrow()
+        val expectedDueAt = endOfDay(dueDate)
+
+        assertThat(result.dueAt).isEqualTo(expectedDueAt)
+        assertThat(savedTask.dueAt).isEqualTo(expectedDueAt)
+        assertThat(savedTask.dueAt?.nano).isEqualTo(999_999_000)
+    }
+
+    @Test
+    fun `createTask should allow due date today`() {
+        val user = createLocalUserForValidToken()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+        testDataFactory.createTestMembership(user = user, household = household)
+        val today = LocalDate.now(clock)
+
+        authenticateAs()
+
+        val result = taskService.createTask(
+            householdId = household.id!!,
+            task = TaskRegisterDTO(
+                title = "Today task",
+                reward = 20,
+                dueAt = today.atStartOfDay(),
+            )
+        )
+
+        assertThat(result.dueAt).isEqualTo(endOfDay(today))
+    }
+
+    @Test
+    fun `createTask should reject due date before today`() {
+        val user = createLocalUserForValidToken()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+        testDataFactory.createTestMembership(user = user, household = household)
+
+        authenticateAs()
+
+        assertThatThrownBy {
+            taskService.createTask(
+                householdId = household.id!!,
+                task = TaskRegisterDTO(
+                    title = "Past task",
+                    reward = 20,
+                    dueAt = LocalDate.now(clock).minusDays(1).atTime(23, 59),
+                )
+            )
+        }
+            .isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessage("Task due date cannot be in the past")
     }
 
     @Test
@@ -258,6 +336,97 @@ class TaskServiceIntegrationTest : BaseIntegrationTest() {
         assertThat(updatedTask.title).isEqualTo("Updated task")
         assertThat(updatedTask.description).isEqualTo("Updated description")
         assertThat(updatedTask.reward).isEqualTo(30)
+    }
+
+    @Test
+    fun `updateTask should set due date`() {
+        val user = createLocalUserForValidToken()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+        testDataFactory.createTestMembership(user = user, household = household)
+        val task = testDataFactory.createTestFreeTask(household = household, createdBy = user)
+        val dueDate = LocalDate.now(clock).plusDays(2)
+
+        authenticateAs()
+
+        val result = taskService.updateTask(
+            taskId = task.id!!,
+            newTask = TaskRegisterDTO(
+                title = task.title,
+                description = task.description,
+                reward = task.reward,
+                dueAt = dueDate.atTime(8, 15),
+            )
+        )
+
+        entityManager.flush()
+        entityManager.clear()
+
+        assertThat(result.dueAt).isEqualTo(endOfDay(dueDate))
+        assertThat(taskRepository.findById(task.id!!).orElseThrow().dueAt)
+            .isEqualTo(endOfDay(dueDate))
+    }
+
+    @Test
+    fun `updateTask should change due date`() {
+        val user = createLocalUserForValidToken()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+        testDataFactory.createTestMembership(user = user, household = household)
+        val originalDueDate = LocalDate.now(clock).plusDays(1)
+        val newDueDate = LocalDate.now(clock).plusDays(5)
+        val task = testDataFactory.createTestTask(
+            household = household,
+            createdBy = user,
+            dueAt = endOfDay(originalDueDate),
+        )
+
+        authenticateAs()
+
+        val result = taskService.updateTask(
+            taskId = task.id!!,
+            newTask = TaskRegisterDTO(
+                title = task.title,
+                description = task.description,
+                reward = task.reward,
+                dueAt = newDueDate.atTime(16, 45),
+            )
+        )
+
+        entityManager.flush()
+        entityManager.clear()
+
+        assertThat(result.dueAt).isEqualTo(endOfDay(newDueDate))
+        assertThat(taskRepository.findById(task.id!!).orElseThrow().dueAt)
+            .isEqualTo(endOfDay(newDueDate))
+    }
+
+    @Test
+    fun `updateTask should remove due date when null`() {
+        val user = createLocalUserForValidToken()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+        testDataFactory.createTestMembership(user = user, household = household)
+        val task = testDataFactory.createTestTask(
+            household = household,
+            createdBy = user,
+            dueAt = endOfDay(LocalDate.now(clock).plusDays(1)),
+        )
+
+        authenticateAs()
+
+        val result = taskService.updateTask(
+            taskId = task.id!!,
+            newTask = TaskRegisterDTO(
+                title = task.title,
+                description = task.description,
+                reward = task.reward,
+                dueAt = null,
+            )
+        )
+
+        entityManager.flush()
+        entityManager.clear()
+
+        assertThat(result.dueAt).isNull()
+        assertThat(taskRepository.findById(task.id!!).orElseThrow().dueAt).isNull()
     }
 
     @Test

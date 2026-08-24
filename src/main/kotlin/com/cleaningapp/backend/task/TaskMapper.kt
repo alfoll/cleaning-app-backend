@@ -13,6 +13,7 @@ fun TaskEntity.toDto(): TaskResponseDTO = TaskResponseDTO(
     title = title,
     description = description,
     reward = reward,
+    dueAt = dueAt,
 
     isAssigned = assignedTo != null,
     assignedTo = assignedTo?.user?.id, // может быть null (никем не забронирована), на фронт передаю именно ЮЗЕРА
@@ -28,6 +29,7 @@ fun TaskRegisterDTO.toTaskEntity(creator: UserEntity, household: HouseholdEntity
         title = title,
         description = description,
         reward = reward,
+        dueAt = dueAt,
     ).apply {
         this.household = household
         this.createdBy = creator

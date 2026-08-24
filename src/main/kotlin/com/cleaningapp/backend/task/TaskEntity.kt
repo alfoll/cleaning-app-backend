@@ -40,6 +40,9 @@ class TaskEntity(
     @Column(name = "reward", nullable = false)
     var reward: Int,
 
+    @Column(name = "due_at")
+    var dueAt: LocalDateTime? = null,
+
     @Column(name = "assigned_at")
     var assignedAt: LocalDateTime? = null,
 
