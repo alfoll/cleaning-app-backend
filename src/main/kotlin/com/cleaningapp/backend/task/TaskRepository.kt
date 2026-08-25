@@ -13,6 +13,10 @@ import java.time.LocalDateTime
 
 interface TaskRepository: JpaRepository<TaskEntity, UUID> {
 
+    fun existsByTaskPlanIdAndIsCompletedFalse(taskPlanId: UUID): Boolean
+
+    fun findAllByTaskPlanId(taskPlanId: UUID): List<TaskEntity>
+
     // задачи хозяйства (сорт по созданию сначалп последние)
     @EntityGraph(
         attributePaths = [
@@ -171,4 +175,8 @@ interface TaskRepository: JpaRepository<TaskEntity, UUID> {
     // возвращает id хозяйства без блокировки - нужно для порядка блокировки в сервисах
     @Query("select t.household.id from TaskEntity t where t.id = :taskId")
     fun findHouseholdIdByTaskId(@Param("taskId") taskId: UUID): UUID?
+
+    // возвращает id плана без блокировки, чтобы write-сценарии блокировали TaskPlan до Task
+    @Query("select t.taskPlan.id from TaskEntity t where t.id = :taskId")
+    fun findTaskPlanIdByTaskId(@Param("taskId") taskId: UUID): UUID?
 }

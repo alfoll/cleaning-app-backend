@@ -59,6 +59,14 @@ class TaskPlanRecurrenceCalculator {
         return TaskDueDatePolicy.endOfDay(nextDate)
     }
 
+    fun recalculateAfterOverdueCompletion(
+        completedAt: LocalDateTime,
+        recurrenceType: RecurrenceType,
+    ): TaskPlanSchedule = createSchedule(
+        firstDueAt = completedAt,
+        recurrenceType = recurrenceType,
+    )
+
     private fun calculateNextMonthlyDate(
         currentDate: LocalDate,
         monthlyAnchorDay: Int?,

@@ -3,7 +3,6 @@ package com.cleaningapp.backend.config
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Primary
-import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
 
@@ -13,9 +12,9 @@ class TimeTestConfiguration {
     // фиксированное время для тестов
     @Bean
     @Primary
-    fun fixedClock(): Clock =
-        Clock.fixed(
-            Instant.parse("2026-04-27T12:00:00Z"),
-            ZoneOffset.UTC
+    fun fixedClock(): MutableTestClock =
+        MutableTestClock(
+            defaultInstant = Instant.parse("2026-04-27T12:00:00Z"),
+            zoneId = ZoneOffset.UTC,
         )
 }

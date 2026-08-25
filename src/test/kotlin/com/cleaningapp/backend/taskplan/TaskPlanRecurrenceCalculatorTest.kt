@@ -123,5 +123,65 @@ class TaskPlanRecurrenceCalculatorTest {
         assertThat(march).isEqualTo(endOfDay(LocalDate.of(2026, 3, 29)))
     }
 
+    @Test
+    fun `overdue daily completion should restart schedule from completion date`() {
+        val schedule = calculator.recalculateAfterOverdueCompletion(
+            completedAt = LocalDate.of(2026, 9, 13).atTime(10, 30),
+            recurrenceType = RecurrenceType.DAILY,
+        )
+
+        assertThat(schedule.nextDueAt).isEqualTo(endOfDay(LocalDate.of(2026, 9, 14)))
+        assertThat(schedule.monthlyAnchorDay).isNull()
+        assertThat(schedule.monthlyLastDay).isFalse()
+    }
+
+    @Test
+    fun `overdue weekly completion should restart schedule seven calendar days after completion`() {
+        val schedule = calculator.recalculateAfterOverdueCompletion(
+            completedAt = LocalDate.of(2026, 9, 20).atTime(22, 15),
+            recurrenceType = RecurrenceType.WEEKLY,
+        )
+
+        assertThat(schedule.nextDueAt).isEqualTo(endOfDay(LocalDate.of(2026, 9, 27)))
+        assertThat(schedule.monthlyAnchorDay).isNull()
+        assertThat(schedule.monthlyLastDay).isFalse()
+    }
+
+    @Test
+    fun `overdue monthly completion on normal day should replace old month end anchor`() {
+        val schedule = calculator.recalculateAfterOverdueCompletion(
+            completedAt = LocalDate.of(2027, 2, 5).atTime(9, 0),
+            recurrenceType = RecurrenceType.MONTHLY,
+        )
+
+        assertThat(schedule.nextDueAt).isEqualTo(endOfDay(LocalDate.of(2027, 3, 5)))
+        assertThat(schedule.monthlyAnchorDay).isEqualTo(5)
+        assertThat(schedule.monthlyLastDay).isFalse()
+    }
+
+    @Test
+    fun `overdue monthly completion on last day should establish month end anchor`() {
+        val schedule = calculator.recalculateAfterOverdueCompletion(
+            completedAt = LocalDate.of(2027, 2, 28).atTime(12, 0),
+            recurrenceType = RecurrenceType.MONTHLY,
+        )
+
+        assertThat(schedule.nextDueAt).isEqualTo(endOfDay(LocalDate.of(2027, 3, 31)))
+        assertThat(schedule.monthlyAnchorDay).isNull()
+        assertThat(schedule.monthlyLastDay).isTrue()
+    }
+
+    @Test
+    fun `overdue monthly completion on leap day should establish month end anchor`() {
+        val schedule = calculator.recalculateAfterOverdueCompletion(
+            completedAt = LocalDate.of(2028, 2, 29).atTime(12, 0),
+            recurrenceType = RecurrenceType.MONTHLY,
+        )
+
+        assertThat(schedule.nextDueAt).isEqualTo(endOfDay(LocalDate.of(2028, 3, 31)))
+        assertThat(schedule.monthlyAnchorDay).isNull()
+        assertThat(schedule.monthlyLastDay).isTrue()
+    }
+
     private fun endOfDay(date: LocalDate) = TaskDueDatePolicy.endOfDay(date)
 }

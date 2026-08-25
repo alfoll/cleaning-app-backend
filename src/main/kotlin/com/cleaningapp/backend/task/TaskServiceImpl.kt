@@ -9,11 +9,13 @@ import com.cleaningapp.backend.exception.HouseholdNotFoundException
 import com.cleaningapp.backend.exception.MembershipNotActiveException
 import com.cleaningapp.backend.exception.MembershipNotFoundException
 import com.cleaningapp.backend.exception.TaskNotFoundException
+import com.cleaningapp.backend.exception.TaskPlanNotFoundException
 import com.cleaningapp.backend.exception.UserNotActiveException
 import com.cleaningapp.backend.exception.UserNotFoundException
 import com.cleaningapp.backend.household.HouseholdEntity
 import com.cleaningapp.backend.household.HouseholdRepository
 import com.cleaningapp.backend.taskplan.TaskPlanEntity
+import com.cleaningapp.backend.taskplan.TaskPlanInstanceService
 import com.cleaningapp.backend.taskplan.TaskPlanRecurrenceCalculator
 import com.cleaningapp.backend.taskplan.TaskPlanRepository
 import com.cleaningapp.backend.transaction.TaskCompletionTransactionCommand
@@ -52,6 +54,7 @@ class TaskServiceImpl(
 
     private val transactionService: TransactionService,
     private val activityService: ActivityService,
+    private val taskPlanInstanceService: TaskPlanInstanceService,
     private val dueAtNormalizer: TaskDueAtNormalizer,
     private val recurrenceCalculator: TaskPlanRecurrenceCalculator,
     private val clock: Clock,
@@ -166,7 +169,7 @@ class TaskServiceImpl(
 
         val taskPlan = task.recurrenceType?.let { recurrenceType ->
             val schedule = recurrenceCalculator.createSchedule(normalizedDueAt!!, recurrenceType)
-            taskPlanRepository.save(
+            taskPlanRepository.saveAndFlush(
                 TaskPlanEntity(
                     title = task.title,
                     description = task.description,
@@ -182,12 +185,11 @@ class TaskServiceImpl(
             )
         }
 
-        val normalizedTask = task.copy(dueAt = normalizedDueAt)
-        val savedTask = taskRepository.save(
-            normalizedTask.toTaskEntity(user, household).apply {
-                this.taskPlan = taskPlan
-            }
-        )
+        val savedTask = if (taskPlan == null) {
+            taskRepository.save(task.copy(dueAt = normalizedDueAt).toTaskEntity(user, household))
+        } else {
+            taskPlanInstanceService.createTaskInstance(taskPlan.id!!, normalizedDueAt!!)
+        }
 
         // запись TASK_CREATED в ленту активности
         activityService.createActivityRecord(
@@ -382,9 +384,17 @@ class TaskServiceImpl(
 
         val householdId = taskRepository.findHouseholdIdByTaskId(taskId)
             ?: throw TaskNotFoundException()
+        val taskPlanId = taskRepository.findTaskPlanIdByTaskId(taskId)
 
         val household = getActiveHouseholdForUpdate(householdId)
         val membership = getActiveMembershipForUpdate(user.id!!, household.id!!)
+
+        // B5 блокирует TaskPlan до Task при создании экземпляра.
+        // Сохраняем тот же порядок, чтобы completion не конфликтовал с генерацией.
+        val taskPlan = taskPlanId?.let { id ->
+            taskPlanRepository.findByIdForUpdate(id)
+                ?: throw TaskPlanNotFoundException()
+        }
 
         // достать задачу
         val task = getTaskEntityForUpdate(taskId)
@@ -405,9 +415,10 @@ class TaskServiceImpl(
             throw BusinessConflictException("Only assigned user can complete this task")
 
         // завершаем задачу
+        val completedAt = LocalDateTime.now(clock)
         task.isCompleted = true
         task.completedBy = membership
-        task.completedAt = LocalDateTime.now()
+        task.completedAt = completedAt
 
         // бронь сбрасываем, она больше не нужна, в истории сохранится
         task.assignedTo = null
@@ -435,7 +446,24 @@ class TaskServiceImpl(
             )
         )
 
-        return task.toDto(LocalDateTime.now(clock))
+        if (taskPlan?.isActive == true) {
+            val dueAt = checkNotNull(task.dueAt) {
+                "Recurring task must have a due date"
+            }
+
+            if (completedAt.isAfter(dueAt)) {
+                val schedule = recurrenceCalculator.recalculateAfterOverdueCompletion(
+                    completedAt = completedAt,
+                    recurrenceType = taskPlan.recurrenceType,
+                )
+
+                taskPlan.nextDueAt = schedule.nextDueAt
+                taskPlan.monthlyAnchorDay = schedule.monthlyAnchorDay
+                taskPlan.monthlyLastDay = schedule.monthlyLastDay
+            }
+        }
+
+        return task.toDto(completedAt)
     }
 
     @Transactional(readOnly = true)

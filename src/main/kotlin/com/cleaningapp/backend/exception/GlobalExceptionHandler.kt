@@ -87,6 +87,12 @@ class GlobalExceptionHandler {
         return ExcResponse("404 TASK_TEMPLATE_NOT_FOUND", e.message)
     }
 
+    @ExceptionHandler(TaskPlanNotFoundException::class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    fun handleTaskPlanNotFoundException(e: TaskPlanNotFoundException): ExcResponse {
+        return ExcResponse("404 TASK_PLAN_NOT_FOUND", e.message)
+    }
+
     // привилегия не найдена
     @ExceptionHandler(PrivilegeNotFoundException::class)
     @ResponseStatus(HttpStatus.NOT_FOUND) // 404
