@@ -81,6 +81,12 @@ class GlobalExceptionHandler {
         return ExcResponse("404 TASK_NOT_FOUND", e.message)
     }
 
+    @ExceptionHandler(TaskTemplateNotFoundException::class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    fun handleTaskTemplateNotFoundException(e: TaskTemplateNotFoundException): ExcResponse {
+        return ExcResponse("404 TASK_TEMPLATE_NOT_FOUND", e.message)
+    }
+
     // привилегия не найдена
     @ExceptionHandler(PrivilegeNotFoundException::class)
     @ResponseStatus(HttpStatus.NOT_FOUND) // 404

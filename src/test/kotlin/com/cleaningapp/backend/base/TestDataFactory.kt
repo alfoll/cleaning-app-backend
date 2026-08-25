@@ -9,6 +9,8 @@ import com.cleaningapp.backend.privilege.PrivilegeEntity
 import com.cleaningapp.backend.privilege.PrivilegeRepository
 import com.cleaningapp.backend.task.TaskEntity
 import com.cleaningapp.backend.task.TaskRepository
+import com.cleaningapp.backend.tasktemplate.TaskTemplateEntity
+import com.cleaningapp.backend.tasktemplate.TaskTemplateRepository
 import com.cleaningapp.backend.transaction.TransactionEntity
 import com.cleaningapp.backend.transaction.TransactionRepository
 import com.cleaningapp.backend.transaction.TransactionType
@@ -33,6 +35,7 @@ class TestDataFactory(
     private val householdRepository: HouseholdRepository,
     private val userHouseholdRepository: UserHouseholdRepository,
     private val taskRepository: TaskRepository,
+    private val taskTemplateRepository: TaskTemplateRepository,
     private val privilegeRepository: PrivilegeRepository,
     private val transactionRepository: TransactionRepository,
     private val activityRepository: ActivityRepository,
@@ -268,6 +271,32 @@ class TestDataFactory(
             completedBy = completedBy,
             completedAt = LocalDateTime.now(clock),
         )
+    }
+
+    fun createTestTaskTemplate(
+        household: HouseholdEntity,
+        createdBy: UserEntity = household.createdByUser,
+        title: String = "Test task template",
+        description: String? = "Test task template description",
+        reward: Int = 20,
+        createdAt: LocalDateTime = LocalDateTime.now(clock),
+        isActive: Boolean = true,
+    ): TaskTemplateEntity {
+        require(reward in 5..100) {
+            "reward must be between 5 and 100"
+        }
+
+        val template = TaskTemplateEntity(
+            title = title,
+            description = description,
+            reward = reward,
+            createdAt = createdAt,
+            isActive = isActive,
+        )
+        template.household = household
+        template.createdBy = createdBy
+
+        return taskTemplateRepository.save(template)
     }
 
 
@@ -534,6 +563,33 @@ class TestDataFactory(
         entityManager.clear()
 
         return privilegeRepository.findById(privilegeId).orElseThrow()
+    }
+
+    // для стабильной проверки сортировки шаблонов по createdAt DESC
+    fun updateTaskTemplateCreatedAt(
+        templateId: UUID,
+        createdAt: LocalDateTime,
+    ): TaskTemplateEntity {
+
+        entityManager.flush()
+
+        val rowsUpdated = jdbcTemplate.update(
+            """
+            update task_template
+            set created_at = ?
+            where id = ?
+        """.trimIndent(),
+            createdAt,
+            templateId,
+        )
+
+        require(rowsUpdated == 1) {
+            "Expected to update exactly one task template row for id=$templateId, but updated $rowsUpdated rows"
+        }
+
+        entityManager.clear()
+
+        return taskTemplateRepository.findById(templateId).orElseThrow()
     }
 
     // для стабильной проверки сортировки activity по createdAt DESC

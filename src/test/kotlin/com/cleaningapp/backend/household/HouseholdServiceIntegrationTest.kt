@@ -9,6 +9,7 @@ import com.cleaningapp.backend.exception.HouseholdNotFoundException
 import com.cleaningapp.backend.exception.MembershipNotFoundException
 import com.cleaningapp.backend.privilege.PrivilegeRepository
 import com.cleaningapp.backend.task.TaskRepository
+import com.cleaningapp.backend.tasktemplate.TaskTemplateRepository
 import com.cleaningapp.backend.transaction.TransactionRepository
 import com.cleaningapp.backend.userhousehold.UserHouseholdRepository
 import jakarta.persistence.EntityManager
@@ -34,6 +35,9 @@ class HouseholdServiceIntegrationTest : BaseIntegrationTest() {
 
     @Autowired
     private lateinit var taskRepository: TaskRepository
+
+    @Autowired
+    private lateinit var taskTemplateRepository: TaskTemplateRepository
 
     @Autowired
     private lateinit var privilegeRepository: PrivilegeRepository
@@ -180,6 +184,11 @@ class HouseholdServiceIntegrationTest : BaseIntegrationTest() {
             createdBy = user,
         )
 
+        val taskTemplate = testDataFactory.createTestTaskTemplate(
+            household = household,
+            createdBy = user,
+        )
+
         testDataFactory.createTestActivity(
             household = household,
             member = membership,
@@ -208,6 +217,7 @@ class HouseholdServiceIntegrationTest : BaseIntegrationTest() {
         assertThat(deletedMembership.balance).isZero()
 
         assertThat(taskRepository.findById(task.id!!)).isEmpty
+        assertThat(taskTemplateRepository.findById(taskTemplate.id!!)).isEmpty
         assertThat(privilegeRepository.findById(privilege.id!!)).isEmpty
 
         assertThat(

@@ -13,6 +13,7 @@ import com.cleaningapp.backend.exception.UserNotActiveException
 import com.cleaningapp.backend.exception.UserNotFoundException
 import com.cleaningapp.backend.privilege.PrivilegeRepository
 import com.cleaningapp.backend.task.TaskRepository
+import com.cleaningapp.backend.tasktemplate.TaskTemplateRepository
 import com.cleaningapp.backend.transaction.TransactionRepository
 import com.cleaningapp.backend.user.UserEntity
 import com.cleaningapp.backend.user.UserRepository
@@ -34,6 +35,7 @@ class HouseholdServiceImpl(
     private val transactionRepository: TransactionRepository,
     private val activityRepository: ActivityRepository,
     private val taskRepository: TaskRepository,
+    private val taskTemplateRepository: TaskTemplateRepository,
     private val privilegeRepository: PrivilegeRepository,
 
     private val activityService: ActivityService,
@@ -160,6 +162,8 @@ class HouseholdServiceImpl(
         activityRepository.deleteAllByHouseholdId(household.id!!)
         // удалить задачи хозяйства
         taskRepository.deleteAllByHouseholdId(household.id!!)
+        // удалить шаблоны задач хозяйства
+        taskTemplateRepository.deleteAllByHouseholdId(household.id!!)
         // удалить привилегии хозяйства
         privilegeRepository.deleteAllByHouseholdId(household.id!!)
     }
