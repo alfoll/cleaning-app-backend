@@ -2,7 +2,7 @@ package com.cleaningapp.backend.taskplan
 
 import com.cleaningapp.backend.exception.BusinessConflictException
 import com.cleaningapp.backend.exception.TaskPlanNotFoundException
-import com.cleaningapp.backend.task.TaskDueAtNormalizer
+import com.cleaningapp.backend.task.TaskDueDatePolicy
 import com.cleaningapp.backend.task.TaskEntity
 import com.cleaningapp.backend.task.TaskRepository
 import org.hibernate.exception.ConstraintViolationException
@@ -17,7 +17,6 @@ import java.util.UUID
 class TaskPlanInstanceServiceImpl(
     private val taskPlanRepository: TaskPlanRepository,
     private val taskRepository: TaskRepository,
-    private val dueAtNormalizer: TaskDueAtNormalizer,
 ) : TaskPlanInstanceService {
 
     private companion object {
@@ -41,7 +40,7 @@ class TaskPlanInstanceServiceImpl(
             title = taskPlan.title,
             description = taskPlan.description,
             reward = taskPlan.reward,
-            dueAt = dueAtNormalizer.normalize(dueAt)!!,
+            dueAt = TaskDueDatePolicy.endOfDay(dueAt.toLocalDate()),
         ).apply {
             household = taskPlan.household
             createdBy = taskPlan.createdBy
