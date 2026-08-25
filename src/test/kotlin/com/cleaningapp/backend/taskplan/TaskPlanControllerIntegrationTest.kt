@@ -8,6 +8,8 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
@@ -111,5 +113,59 @@ class TaskPlanControllerIntegrationTest : BaseIntegrationTest() {
 
         assertThat(taskPlanRepository.findById(taskPlan.id!!).orElseThrow().recurrenceType)
             .isEqualTo(RecurrenceType.DAILY)
+    }
+
+    @Test
+    fun `cancel task plan endpoint should return 204 keep task and expose inactive recurrence`() {
+        val user = createLocalUserForValidToken()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+        testDataFactory.createTestMembership(user = user, household = household)
+        val taskPlan = testDataFactory.createTestTaskPlan(
+            household = household,
+            createdBy = user,
+            recurrenceType = RecurrenceType.WEEKLY,
+        )
+        val task = testDataFactory.createTestFreeTask(
+            household = household,
+            createdBy = user,
+            dueAt = TaskDueDatePolicy.endOfDay(LocalDate.now(clock).plusDays(1)),
+            taskPlan = taskPlan,
+        )
+
+        mockMvc.perform(
+            delete("/api/task-plans/${taskPlan.id}")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $validToken")
+        ).andExpect(status().isNoContent)
+
+        mockMvc.perform(
+            get("/api/tasks/${task.id}")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $validToken")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.taskPlanId").value(taskPlan.id.toString()))
+            .andExpect(jsonPath("$.recurrenceType").value("WEEKLY"))
+            .andExpect(jsonPath("$.recurrenceActive").value(false))
+
+        assertThat(taskPlanRepository.findById(taskPlan.id!!)).isPresent
+        assertThat(taskPlanRepository.findById(taskPlan.id!!).orElseThrow().isActive).isFalse()
+    }
+
+    @Test
+    fun `cancel inactive task plan endpoint should return 409`() {
+        val user = createLocalUserForValidToken()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+        testDataFactory.createTestMembership(user = user, household = household)
+        val taskPlan = testDataFactory.createTestTaskPlan(
+            household = household,
+            createdBy = user,
+            isActive = false,
+        )
+
+        mockMvc.perform(
+            delete("/api/task-plans/${taskPlan.id}")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $validToken")
+        )
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.error").value("409 BUSINESS_CONFLICT"))
     }
 }

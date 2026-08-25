@@ -9,6 +9,9 @@ import org.springframework.data.repository.query.Param
 import java.util.UUID
 
 interface TaskPlanRepository : JpaRepository<TaskPlanEntity, UUID> {
+    @Query("select p.household.id from TaskPlanEntity p where p.id = :taskPlanId")
+    fun findHouseholdIdByTaskPlanId(@Param("taskPlanId") taskPlanId: UUID): UUID?
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from TaskPlanEntity p where p.id = :taskPlanId")
     fun findByIdForUpdate(@Param("taskPlanId") taskPlanId: UUID): TaskPlanEntity?

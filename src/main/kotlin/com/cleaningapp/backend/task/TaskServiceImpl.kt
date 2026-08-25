@@ -258,9 +258,16 @@ class TaskServiceImpl(
 
         val householdId = taskRepository.findHouseholdIdByTaskId(taskId)
             ?: throw TaskNotFoundException()
+        val taskPlanId = taskRepository.findTaskPlanIdByTaskId(taskId)
 
         val household = getActiveHouseholdForUpdate(householdId)
         getActiveMembershipForUpdate(user.id!!, household.id!!)
+
+        // Как и в B5/B6, TaskPlan блокируется до Task.
+        val taskPlan = taskPlanId?.let { id ->
+            taskPlanRepository.findByIdForUpdate(id)
+                ?: throw TaskPlanNotFoundException()
+        }
 
         // достать задачу
         val task = getTaskEntityForUpdate(taskId)
@@ -279,6 +286,9 @@ class TaskServiceImpl(
         // если не создатель - нельзя удалить
         if (task.createdBy.id != user.id)
             throw BusinessConflictException("Only creator can delete task")
+
+        if (taskPlan?.isActive == true)
+            taskPlan.isActive = false
 
         taskRepository.delete(task)
     }
