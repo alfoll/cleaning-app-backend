@@ -208,11 +208,13 @@ class TestDataFactory(
         household: HouseholdEntity,
         createdBy: UserEntity = household.createdByUser,
         reward: Int = 20,
+        dueAt: LocalDateTime? = null,
 ): TaskEntity =
         createTestTask(
             household = household,
             createdBy = createdBy,
             reward = reward,
+            dueAt = dueAt,
             assignedTo = null,
             assignedAt = null,
             isCompleted = false,
@@ -226,6 +228,7 @@ class TestDataFactory(
         createdBy: UserEntity = household.createdByUser,
         reward: Int = 20,
         assignedTo: UserHouseholdEntity,
+        dueAt: LocalDateTime? = null,
     ): TaskEntity {
 
         requireSameHousehold(household, assignedTo)
@@ -234,6 +237,7 @@ class TestDataFactory(
             household = household,
             createdBy = createdBy,
             reward = reward,
+            dueAt = dueAt,
             assignedTo = assignedTo,
             assignedAt = LocalDateTime.now(clock),
             isCompleted = false,
@@ -248,6 +252,7 @@ class TestDataFactory(
         createdBy: UserEntity = household.createdByUser,
         reward: Int = 20,
         completedBy: UserHouseholdEntity,
+        dueAt: LocalDateTime? = null,
     ): TaskEntity {
 
         requireSameHousehold(household, completedBy)
@@ -256,6 +261,7 @@ class TestDataFactory(
             household = household,
             createdBy = createdBy,
             reward = reward,
+            dueAt = dueAt,
             assignedTo = null,
             assignedAt = null,
             isCompleted = true,

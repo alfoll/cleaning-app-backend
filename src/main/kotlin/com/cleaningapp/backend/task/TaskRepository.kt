@@ -9,6 +9,7 @@ import jakarta.persistence.LockModeType
 import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.EntityGraph
+import java.time.LocalDateTime
 
 interface TaskRepository: JpaRepository<TaskEntity, UUID> {
 
@@ -94,6 +95,35 @@ interface TaskRepository: JpaRepository<TaskEntity, UUID> {
     )
     fun findAllByHouseholdIdAndAssignedToIsNullAndIsCompletedFalseOrderByCreatedAtDesc(
         householdId: UUID,
+        pageable: Pageable,
+    ): List<TaskEntity>
+
+    @EntityGraph(
+        attributePaths = [
+            "createdBy",
+            "assignedTo",
+            "assignedTo.user",
+            "completedBy",
+            "completedBy.user"
+        ]
+    )
+    fun findAllByHouseholdIdAndIsCompletedFalseAndDueAtIsNotNullOrderByDueAtAsc(
+        householdId: UUID,
+        pageable: Pageable,
+    ): List<TaskEntity>
+
+    @EntityGraph(
+        attributePaths = [
+            "createdBy",
+            "assignedTo",
+            "assignedTo.user",
+            "completedBy",
+            "completedBy.user"
+        ]
+    )
+    fun findAllByHouseholdIdAndIsCompletedFalseAndDueAtIsNotNullAndDueAtBeforeOrderByDueAtAsc(
+        householdId: UUID,
+        now: LocalDateTime,
         pageable: Pageable,
     ): List<TaskEntity>
 

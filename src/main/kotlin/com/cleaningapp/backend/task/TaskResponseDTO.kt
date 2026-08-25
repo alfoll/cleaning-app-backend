@@ -21,4 +21,6 @@ data class TaskResponseDTO(
     val isCompleted: Boolean = false,
     val completedBy: UUID? = null, // в реальности UserHousehold.id, но тут отдается User.id
     val completedAt: LocalDateTime? = null,
+
+    val isOverdue: Boolean,
 )

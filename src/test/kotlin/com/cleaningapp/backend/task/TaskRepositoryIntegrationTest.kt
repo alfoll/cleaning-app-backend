@@ -5,6 +5,9 @@ import jakarta.persistence.EntityManager
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.data.domain.PageRequest
+import java.time.Clock
+import java.time.LocalDate
 import java.time.LocalDateTime
 
 class TaskRepositoryIntegrationTest : BaseIntegrationTest() {
@@ -14,6 +17,12 @@ class TaskRepositoryIntegrationTest : BaseIntegrationTest() {
 
     @Autowired
     private lateinit var entityManager: EntityManager
+
+    @Autowired
+    private lateinit var clock: Clock
+
+    private fun endOfDay(date: LocalDate): LocalDateTime =
+        date.atTime(23, 59, 59, 999_999_000)
 
     @Test
     fun `task filter queries should return expected tasks with repository sorting contract`() {
@@ -163,6 +172,101 @@ class TaskRepositoryIntegrationTest : BaseIntegrationTest() {
             .containsExactly(
                 newerCompletedTask.id,
                 olderCompletedTask.id,
+            )
+    }
+
+    @Test
+    fun `deadline queries should apply filter sorting and household contract`() {
+        val currentUser = createLocalUserForValidToken()
+        val otherUser = testDataFactory.createTestUser()
+        val household = testDataFactory.createTestHousehold(createdBy = currentUser)
+        val currentMembership = testDataFactory.createTestMembership(
+            user = currentUser,
+            household = household,
+        )
+        val otherMembership = testDataFactory.createTestMembership(
+            user = otherUser,
+            household = household,
+        )
+        val otherHousehold = testDataFactory.createTestHousehold(createdBy = currentUser)
+        testDataFactory.createTestMembership(user = currentUser, household = otherHousehold)
+        val now = LocalDateTime.now(clock)
+
+        val oldestOverdueFree = testDataFactory.createTestFreeTask(
+            household = household,
+            createdBy = currentUser,
+            dueAt = now.minusDays(3),
+        )
+        val overdueAssigned = testDataFactory.createTestAssignedTask(
+            household = household,
+            createdBy = currentUser,
+            assignedTo = otherMembership,
+            dueAt = now.minusDays(2),
+        )
+        val today = testDataFactory.createTestFreeTask(
+            household = household,
+            createdBy = currentUser,
+            dueAt = endOfDay(LocalDate.now(clock)),
+        )
+        val future = testDataFactory.createTestAssignedTask(
+            household = household,
+            createdBy = currentUser,
+            assignedTo = currentMembership,
+            dueAt = now.plusDays(2),
+        )
+        val withoutDeadline = testDataFactory.createTestFreeTask(
+            household = household,
+            createdBy = currentUser,
+        )
+        val completedPast = testDataFactory.createTestCompletedTask(
+            household = household,
+            createdBy = currentUser,
+            completedBy = currentMembership,
+            dueAt = now.minusDays(4),
+        )
+        val otherHouseholdOverdue = testDataFactory.createTestFreeTask(
+            household = otherHousehold,
+            createdBy = currentUser,
+            dueAt = now.minusDays(5),
+        )
+
+        val firstPage = PageRequest.of(0, 150)
+        val withDeadline =
+            taskRepository.findAllByHouseholdIdAndIsCompletedFalseAndDueAtIsNotNullOrderByDueAtAsc(
+                household.id!!,
+                firstPage,
+            )
+        val overdue =
+            taskRepository.findAllByHouseholdIdAndIsCompletedFalseAndDueAtIsNotNullAndDueAtBeforeOrderByDueAtAsc(
+                household.id!!,
+                now,
+                firstPage,
+            )
+
+        assertThat(withDeadline.map { it.id })
+            .containsExactly(
+                oldestOverdueFree.id,
+                overdueAssigned.id,
+                today.id,
+                future.id,
+            )
+            .doesNotContain(
+                withoutDeadline.id,
+                completedPast.id,
+                otherHouseholdOverdue.id,
+            )
+
+        assertThat(overdue.map { it.id })
+            .containsExactly(
+                oldestOverdueFree.id,
+                overdueAssigned.id,
+            )
+            .doesNotContain(
+                today.id,
+                future.id,
+                withoutDeadline.id,
+                completedPast.id,
+                otherHouseholdOverdue.id,
             )
     }
 

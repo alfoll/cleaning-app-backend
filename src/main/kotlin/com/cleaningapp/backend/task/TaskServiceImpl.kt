@@ -35,6 +35,8 @@ enum class TaskFilterType {
     FREE, // вске не выполненные и не забронированные
     MY, // все не выполненные и забронированные за юзером
     COMPLETED, // все выполненные
+    WITH_DEADLINE, // все невыполненные со сроком
+    OVERDUE, // все невыполненные с истекшим сроком
 }
 
 @Service
@@ -55,6 +57,8 @@ class TaskServiceImpl(
         const val COMPLETED_TASK_LIMIT = 150
         const val MY_TASK_LIMIT = 150
         const val FREE_TASK_LIMIT = 150
+        const val WITH_DEADLINE_TASK_LIMIT = 150
+        const val OVERDUE_TASK_LIMIT = 150
     }
 
     // достать юзера из контекста
@@ -176,7 +180,7 @@ class TaskServiceImpl(
             )
         )
 
-        return savedTask.toDto() // сохранение оставить - новая сущность
+        return savedTask.toDto(LocalDateTime.now(clock)) // сохранение оставить - новая сущность
     }
 
     // нельзя менять условия задачи если она взята в работу (забронена) или выполнена
@@ -216,7 +220,7 @@ class TaskServiceImpl(
         task.dueAt = normalizeDueAt(newTask.dueAt)
 
 //        return taskRepository.save(task).toDto() // managed entity
-        return task.toDto()
+        return task.toDto(LocalDateTime.now(clock))
     }
 
     // массовая сущность - если свободна то можно жестко удалить
@@ -293,7 +297,7 @@ class TaskServiceImpl(
         )
 
 //        return taskRepository.save(task).toDto() // managed entity
-        return task.toDto()
+        return task.toDto(LocalDateTime.now(clock))
     }
 
     // снять бронь с задачи может только тот кто ее забронировал
@@ -341,7 +345,7 @@ class TaskServiceImpl(
         )
 
 //        return taskRepository.save(task).toDto() // managed entity
-        return task.toDto()
+        return task.toDto(LocalDateTime.now(clock))
     }
 
     // задача должна быть забронирована чтобы ее завершить
@@ -406,7 +410,7 @@ class TaskServiceImpl(
             )
         )
 
-        return task.toDto()
+        return task.toDto(LocalDateTime.now(clock))
     }
 
     @Transactional(readOnly = true)
@@ -420,7 +424,7 @@ class TaskServiceImpl(
         // валидировать задачу - хозяйство задачи активно + участие активно
         validateTaskAccess(task, user)
 
-        return task.toDto()
+        return task.toDto(LocalDateTime.now(clock))
     }
 
     // через фильтр а не отдельными методами
@@ -437,6 +441,7 @@ class TaskServiceImpl(
         // достать активное участие
         val membership = getActiveMembership(user.id!!, household.id!!)
 
+        val now = LocalDateTime.now(clock)
 
         // сформировать список задач по запросу фильтра
         val tasks = when (filter) {
@@ -463,9 +468,22 @@ class TaskServiceImpl(
                     householdId = household.id!!,
                     pageable = PageRequest.of(0, COMPLETED_TASK_LIMIT)
                 )
+
+            TaskFilterType.WITH_DEADLINE ->
+                taskRepository.findAllByHouseholdIdAndIsCompletedFalseAndDueAtIsNotNullOrderByDueAtAsc(
+                    householdId = household.id!!,
+                    pageable = PageRequest.of(0, WITH_DEADLINE_TASK_LIMIT),
+                )
+
+            TaskFilterType.OVERDUE ->
+                taskRepository.findAllByHouseholdIdAndIsCompletedFalseAndDueAtIsNotNullAndDueAtBeforeOrderByDueAtAsc(
+                    householdId = household.id!!,
+                    now = now,
+                    pageable = PageRequest.of(0, OVERDUE_TASK_LIMIT),
+                )
         }
 
-        return tasks.map { it.toDto() }
+        return tasks.map { it.toDto(now) }
     }
 
     // для UserHouseholdService - при удалении/выходе пользователя - через участие

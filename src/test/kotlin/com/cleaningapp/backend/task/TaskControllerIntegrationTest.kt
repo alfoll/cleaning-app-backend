@@ -55,6 +55,9 @@ class TaskControllerIntegrationTest : BaseIntegrationTest() {
         COMPLETE,
     }
 
+    private fun endOfDay(date: LocalDate): LocalDateTime =
+        date.atTime(23, 59, 59, 999_999_000)
+
     private fun requestForMissingTask(
         endpoint: MissingTaskEndpoint,
         taskId: UUID,
@@ -598,6 +601,127 @@ class TaskControllerIntegrationTest : BaseIntegrationTest() {
         )
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.error").value("400 VALIDATION_ERROR"))
+    }
+
+    @Test
+    fun `get household tasks WITH_DEADLINE should return unfinished deadlines sorted ascending`() {
+        val user = createLocalUserForValidToken()
+        val otherUser = testDataFactory.createTestUser()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+        val membership = testDataFactory.createTestMembership(user = user, household = household)
+        val otherMembership = testDataFactory.createTestMembership(user = otherUser, household = household)
+        val otherHousehold = testDataFactory.createTestHousehold(createdBy = user)
+        testDataFactory.createTestMembership(user = user, household = otherHousehold)
+        val now = LocalDateTime.now(clock)
+
+        val overdueFree = testDataFactory.createTestFreeTask(
+            household = household,
+            createdBy = user,
+            dueAt = now.minusDays(2),
+        )
+        val overdueAssigned = testDataFactory.createTestAssignedTask(
+            household = household,
+            createdBy = otherUser,
+            assignedTo = otherMembership,
+            dueAt = now.minusDays(1),
+        )
+        val today = testDataFactory.createTestFreeTask(
+            household = household,
+            createdBy = user,
+            dueAt = endOfDay(LocalDate.now(clock)),
+        )
+        val future = testDataFactory.createTestAssignedTask(
+            household = household,
+            createdBy = user,
+            assignedTo = membership,
+            dueAt = now.plusDays(2),
+        )
+        testDataFactory.createTestFreeTask(household = household, createdBy = user)
+        testDataFactory.createTestCompletedTask(
+            household = household,
+            createdBy = user,
+            completedBy = membership,
+            dueAt = now.minusDays(3),
+        )
+        testDataFactory.createTestFreeTask(
+            household = otherHousehold,
+            createdBy = user,
+            dueAt = now.minusDays(4),
+        )
+
+        mockMvc.perform(
+            get("/api/households/${household.id}/tasks")
+                .param("filter", "WITH_DEADLINE")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $validToken")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.length()").value(4))
+            .andExpect(jsonPath("$[0].id").value(overdueFree.id.toString()))
+            .andExpect(jsonPath("$[0].isOverdue").value(true))
+            .andExpect(jsonPath("$[1].id").value(overdueAssigned.id.toString()))
+            .andExpect(jsonPath("$[1].isOverdue").value(true))
+            .andExpect(jsonPath("$[2].id").value(today.id.toString()))
+            .andExpect(jsonPath("$[2].isOverdue").value(false))
+            .andExpect(jsonPath("$[3].id").value(future.id.toString()))
+            .andExpect(jsonPath("$[3].isOverdue").value(false))
+    }
+
+    @Test
+    fun `get household tasks OVERDUE should return unfinished expired deadlines sorted ascending`() {
+        val user = createLocalUserForValidToken()
+        val otherUser = testDataFactory.createTestUser()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+        val membership = testDataFactory.createTestMembership(user = user, household = household)
+        val otherMembership = testDataFactory.createTestMembership(user = otherUser, household = household)
+        val otherHousehold = testDataFactory.createTestHousehold(createdBy = user)
+        testDataFactory.createTestMembership(user = user, household = otherHousehold)
+        val now = LocalDateTime.now(clock)
+
+        val overdueFree = testDataFactory.createTestFreeTask(
+            household = household,
+            createdBy = user,
+            dueAt = now.minusDays(3),
+        )
+        val overdueAssigned = testDataFactory.createTestAssignedTask(
+            household = household,
+            createdBy = otherUser,
+            assignedTo = otherMembership,
+            dueAt = now.minusDays(1),
+        )
+        testDataFactory.createTestFreeTask(
+            household = household,
+            createdBy = user,
+            dueAt = endOfDay(LocalDate.now(clock)),
+        )
+        testDataFactory.createTestFreeTask(
+            household = household,
+            createdBy = user,
+            dueAt = now.plusDays(1),
+        )
+        testDataFactory.createTestFreeTask(household = household, createdBy = user)
+        testDataFactory.createTestCompletedTask(
+            household = household,
+            createdBy = user,
+            completedBy = membership,
+            dueAt = now.minusDays(4),
+        )
+        testDataFactory.createTestFreeTask(
+            household = otherHousehold,
+            createdBy = user,
+            dueAt = now.minusDays(5),
+        )
+
+        mockMvc.perform(
+            get("/api/households/${household.id}/tasks")
+                .param("filter", "OVERDUE")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $validToken")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.length()").value(2))
+            .andExpect(jsonPath("$[0].id").value(overdueFree.id.toString()))
+            .andExpect(jsonPath("$[0].isOverdue").value(true))
+            .andExpect(jsonPath("$[1].id").value(overdueAssigned.id.toString()))
+            .andExpect(jsonPath("$[1].isOverdue").value(true))
     }
 
     @Test

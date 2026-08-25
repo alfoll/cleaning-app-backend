@@ -1320,4 +1320,100 @@ class TaskServiceIntegrationTest : BaseIntegrationTest() {
         assertThat(result.last().id).isEqualTo(tasks[1].id)
         assertThat(result.map { it.id }).doesNotContain(tasks.first().id)
     }
+
+    @Test
+    fun `task responses should calculate overdue state`() {
+        val user = createLocalUserForValidToken()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+        val membership = testDataFactory.createTestMembership(user = user, household = household)
+        val now = LocalDateTime.now(clock)
+
+        val withoutDeadline = testDataFactory.createTestFreeTask(
+            household = household,
+            createdBy = user,
+        )
+        val future = testDataFactory.createTestFreeTask(
+            household = household,
+            createdBy = user,
+            dueAt = now.plusDays(1),
+        )
+        val today = testDataFactory.createTestFreeTask(
+            household = household,
+            createdBy = user,
+            dueAt = endOfDay(LocalDate.now(clock)),
+        )
+        val overdue = testDataFactory.createTestFreeTask(
+            household = household,
+            createdBy = user,
+            dueAt = now.minusDays(1),
+        )
+        val completedPast = testDataFactory.createTestCompletedTask(
+            household = household,
+            createdBy = user,
+            completedBy = membership,
+            dueAt = now.minusDays(2),
+        )
+
+        authenticateAs()
+
+        val results = taskService.getHouseholdTasks(household.id!!, TaskFilterType.ALL)
+            .associateBy { it.id }
+
+        assertThat(results.getValue(withoutDeadline.id!!).isOverdue).isFalse()
+        assertThat(results.getValue(future.id!!).isOverdue).isFalse()
+        assertThat(results.getValue(today.id!!).isOverdue).isFalse()
+        assertThat(results.getValue(overdue.id!!).isOverdue).isTrue()
+        assertThat(results.getValue(completedPast.id!!).isOverdue).isFalse()
+    }
+
+    @Test
+    fun `getHouseholdTasks WITH_DEADLINE should return at most 150 earliest deadlines`() {
+        val user = createLocalUserForValidToken()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+        testDataFactory.createTestMembership(user = user, household = household)
+        val now = LocalDateTime.now(clock)
+
+        val tasks = (1..151).map { index ->
+            testDataFactory.createTestFreeTask(
+                household = household,
+                createdBy = user,
+                dueAt = now.plusMinutes(index.toLong()),
+            )
+        }
+
+        authenticateAs()
+
+        val result = taskService.getHouseholdTasks(household.id!!, TaskFilterType.WITH_DEADLINE)
+
+        assertThat(result).hasSize(150)
+        assertThat(result.first().id).isEqualTo(tasks.first().id)
+        assertThat(result.last().id).isEqualTo(tasks[149].id)
+        assertThat(result.map { it.id }).doesNotContain(tasks.last().id)
+    }
+
+    @Test
+    fun `getHouseholdTasks OVERDUE should return at most 150 oldest deadlines`() {
+        val user = createLocalUserForValidToken()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+        testDataFactory.createTestMembership(user = user, household = household)
+        val now = LocalDateTime.now(clock)
+
+        val tasks = (1..151).map { index ->
+            testDataFactory.createTestFreeTask(
+                household = household,
+                createdBy = user,
+                dueAt = now.minusMinutes((152 - index).toLong()),
+            )
+        }
+
+        authenticateAs()
+
+        val result = taskService.getHouseholdTasks(household.id!!, TaskFilterType.OVERDUE)
+
+        assertThat(result).hasSize(150)
+        assertThat(result.first().id).isEqualTo(tasks.first().id)
+        assertThat(result.last().id).isEqualTo(tasks[149].id)
+        assertThat(result.map { it.id }).doesNotContain(tasks.last().id)
+        assertThat(result).allMatch { it.isOverdue }
+    }
 }

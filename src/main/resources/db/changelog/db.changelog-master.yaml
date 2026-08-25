@@ -8,3 +8,6 @@ databaseChangeLog:
   - include:
       file: changes/003-add-task-due-at.sql
       relativeToChangelogFile: true
+  - include:
+      file: changes/004-add-task-due-at-index.sql
+      relativeToChangelogFile: true

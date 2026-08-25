@@ -2,8 +2,9 @@ package com.cleaningapp.backend.task
 
 import com.cleaningapp.backend.household.HouseholdEntity
 import com.cleaningapp.backend.user.UserEntity
+import java.time.LocalDateTime
 
-fun TaskEntity.toDto(): TaskResponseDTO = TaskResponseDTO(
+fun TaskEntity.toDto(now: LocalDateTime): TaskResponseDTO = TaskResponseDTO(
     id = id!!, // когда используется маппер id уже гарантированно не null (null только до сохранения в бд)
 
     householdId = household.id!!, // когда используется маппер id уже гарантированно не null (null только до сохранения в бд)
@@ -22,6 +23,8 @@ fun TaskEntity.toDto(): TaskResponseDTO = TaskResponseDTO(
     isCompleted = isCompleted,
     completedBy = completedBy?.user?.id, // может быть null (никем не выполнена), на фронт передаю именно ЮЗЕРА
     completedAt = completedAt,
+
+    isOverdue = !isCompleted && dueAt?.isBefore(now) == true,
 )
 
 fun TaskRegisterDTO.toTaskEntity(creator: UserEntity, household: HouseholdEntity): TaskEntity =
