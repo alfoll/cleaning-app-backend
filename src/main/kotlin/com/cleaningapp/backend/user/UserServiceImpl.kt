@@ -11,6 +11,7 @@ import com.cleaningapp.backend.household.HouseholdRepository
 import com.cleaningapp.backend.household.HouseholdService
 import com.cleaningapp.backend.security.FirebaseAuthService
 import com.cleaningapp.backend.task.TaskService
+import com.cleaningapp.backend.taskplan.TaskPlanRepository
 import com.cleaningapp.backend.transaction.BalanceResetTransactionCommand
 import com.cleaningapp.backend.transaction.TransactionService
 import com.cleaningapp.backend.userhousehold.UserHouseholdRepository
@@ -25,6 +26,7 @@ class UserServiceImpl(
     private val userRepository: UserRepository,
     private val userHouseholdRepository: UserHouseholdRepository,
     private val householdRepository: HouseholdRepository,
+    private val taskPlanRepository: TaskPlanRepository,
 
     private val householdService: HouseholdService,
     private val taskService: TaskService,
@@ -86,11 +88,11 @@ class UserServiceImpl(
 
         // найти все хозяйства -> везде деактивировать и обнулить баланс
         // отсортированный порядок
-        val householdIds = userHouseholdRepository
+        val membershipHouseholdIds = userHouseholdRepository
             .findAllByUserIdAndIsUserActiveTrue(user.id!!)
             .map { it.household.id!! }
-            .distinct()
-            .sorted()
+        val planHouseholdIds = taskPlanRepository.findActivePlanHouseholdIdsByCreatedById(user.id!!)
+        val householdIds = (membershipHouseholdIds + planHouseholdIds).distinct().sorted()
 
         for (householdId in householdIds) {
             // если это последний пользователь КАКОГО-ЛИБО ИЗ СВОИХ ХОЗЯЙСТВ - удаляем хозяйство
@@ -99,7 +101,14 @@ class UserServiceImpl(
                 ?: continue
 
             val lockedMembership = userHouseholdRepository.findByUserIdAndHouseholdIdForUpdate(user.id!!, householdId)
-                ?: continue
+
+            taskPlanRepository.deactivateActivePlansByHouseholdIdAndCreatedById(
+                householdId = householdId,
+                createdById = user.id!!,
+            )
+
+            if (lockedMembership == null)
+                continue
             if (!lockedMembership.isUserActive)
                 continue
 

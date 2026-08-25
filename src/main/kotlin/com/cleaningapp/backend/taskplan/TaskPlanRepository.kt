@@ -11,6 +11,34 @@ import java.time.LocalDateTime
 import java.util.UUID
 
 interface TaskPlanRepository : JpaRepository<TaskPlanEntity, UUID> {
+    @Modifying(flushAutomatically = true, clearAutomatically = false)
+    @Query(
+        """
+        update TaskPlanEntity p
+        set p.isActive = false,
+            p.version = p.version + 1
+        where p.household.id = :householdId
+          and p.createdBy.id = :createdById
+          and p.isActive = true
+        """
+    )
+    fun deactivateActivePlansByHouseholdIdAndCreatedById(
+        @Param("householdId") householdId: UUID,
+        @Param("createdById") createdById: UUID,
+    ): Int
+
+    @Query(
+        """
+        select distinct p.household.id
+        from TaskPlanEntity p
+        where p.createdBy.id = :createdById
+          and p.isActive = true
+        """
+    )
+    fun findActivePlanHouseholdIdsByCreatedById(
+        @Param("createdById") createdById: UUID,
+    ): List<UUID>
+
     @Query(
         """
         select p.id

@@ -14,6 +14,7 @@ import com.cleaningapp.backend.household.HouseholdEntity
 import com.cleaningapp.backend.household.HouseholdRepository
 import com.cleaningapp.backend.household.HouseholdService
 import com.cleaningapp.backend.task.TaskService
+import com.cleaningapp.backend.taskplan.TaskPlanRepository
 import com.cleaningapp.backend.transaction.BalanceResetTransactionCommand
 import com.cleaningapp.backend.transaction.TransactionService
 import com.cleaningapp.backend.user.UserEntity
@@ -33,6 +34,7 @@ class UserHouseholdServiceImpl(
     private val userHouseholdRepository: UserHouseholdRepository,
     private val householdRepository: HouseholdRepository,
     private val userRepository: UserRepository,
+    private val taskPlanRepository: TaskPlanRepository,
 
     private val taskService: TaskService,
     private val transactionService: TransactionService,
@@ -184,6 +186,11 @@ class UserHouseholdServiceImpl(
             return
         }
 
+        taskPlanRepository.deactivateActivePlansByHouseholdIdAndCreatedById(
+            householdId = household.id!!,
+            createdById = user.id!!,
+        )
+
         // освободить забронированные задачи
         val releasedTaskAmount = taskService.releaseAssignedTasks(userHousehold.id!!)
 
@@ -238,6 +245,11 @@ class UserHouseholdServiceImpl(
         // проверить что УДАЛЯЕМЫЙ ЮЗЕР активен в хозяйстве
         if (!removedUser.isUserActive)
             throw BusinessConflictException("User to remove is already not active in this household")
+
+        taskPlanRepository.deactivateActivePlansByHouseholdIdAndCreatedById(
+            householdId = household.id!!,
+            createdById = removedUser.user.id!!,
+        )
 
         // освободить забронированные задачи
         val releasedTaskAmount = taskService.releaseAssignedTasks(removedUser.id!!)
