@@ -186,6 +186,7 @@ abstract class BaseConcurrencyIntegrationTest {
                 "transaction",
                 activity,
                 task,
+                task_plan,
                 task_template,
                 privilege,
                 user_household,

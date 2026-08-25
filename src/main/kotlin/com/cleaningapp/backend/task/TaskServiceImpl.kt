@@ -13,6 +13,9 @@ import com.cleaningapp.backend.exception.UserNotActiveException
 import com.cleaningapp.backend.exception.UserNotFoundException
 import com.cleaningapp.backend.household.HouseholdEntity
 import com.cleaningapp.backend.household.HouseholdRepository
+import com.cleaningapp.backend.taskplan.TaskPlanEntity
+import com.cleaningapp.backend.taskplan.TaskPlanRecurrenceCalculator
+import com.cleaningapp.backend.taskplan.TaskPlanRepository
 import com.cleaningapp.backend.transaction.TaskCompletionTransactionCommand
 import com.cleaningapp.backend.transaction.TransactionService
 import com.cleaningapp.backend.user.UserEntity
@@ -26,7 +29,6 @@ import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
-import java.time.LocalDate
 import java.time.LocalDateTime
 import java.util.UUID
 
@@ -46,9 +48,12 @@ class TaskServiceImpl(
     private val userRepository: UserRepository,
     private val householdRepository: HouseholdRepository,
     private val userHouseholdRepository: UserHouseholdRepository,
+    private val taskPlanRepository: TaskPlanRepository,
 
     private val transactionService: TransactionService,
     private val activityService: ActivityService,
+    private val dueAtNormalizer: TaskDueAtNormalizer,
+    private val recurrenceCalculator: TaskPlanRecurrenceCalculator,
     private val clock: Clock,
 ): TaskService {
 
@@ -135,16 +140,6 @@ class TaskServiceImpl(
         taskRepository.findByIdForUpdate(taskId)
             ?: throw TaskNotFoundException()
 
-    private fun normalizeDueAt(dueAt: LocalDateTime?): LocalDateTime? {
-        if (dueAt == null) return null
-
-        val dueDate = dueAt.toLocalDate()
-        if (dueDate.isBefore(LocalDate.now(clock)))
-            throw IllegalArgumentException("Task due date cannot be in the past")
-
-        return dueDate.atTime(23, 59, 59, 999_999_000)
-    }
-
     // проверить что пользователь состоит в хозяйстве в котором хочет взять задачу
     // только для read сценариев - для поддержания порядка блокировки
     private fun validateTaskAccess(task: TaskEntity, currentUser: UserEntity): UserHouseholdEntity {
@@ -158,16 +153,41 @@ class TaskServiceImpl(
 
 
     // создать задачу может любой активный участник хозяйсвта
-    override fun createTask(householdId: UUID, task: TaskRegisterDTO): TaskResponseDTO {
+    override fun createTask(householdId: UUID, task: TaskCreateDTO): TaskResponseDTO {
         // достать юзера + активное хозяйство + участие
         val user = getCurrentUser()
 
         val household = getActiveHouseholdForUpdate(householdId)
         val membership = getActiveMembershipForUpdate(user.id!!, household.id!!)
 
-        // сохраняем задачу
-        val normalizedTask = task.copy(dueAt = normalizeDueAt(task.dueAt))
-        val savedTask = taskRepository.save(normalizedTask.toTaskEntity(user, household))
+        val normalizedDueAt = dueAtNormalizer.normalize(task.dueAt)
+        if (task.recurrenceType != null && normalizedDueAt == null)
+            throw BusinessConflictException("Recurring task requires a due date")
+
+        val taskPlan = task.recurrenceType?.let { recurrenceType ->
+            val schedule = recurrenceCalculator.createSchedule(normalizedDueAt!!, recurrenceType)
+            taskPlanRepository.save(
+                TaskPlanEntity(
+                    title = task.title,
+                    description = task.description,
+                    reward = task.reward,
+                    recurrenceType = recurrenceType,
+                    nextDueAt = schedule.nextDueAt,
+                    monthlyAnchorDay = schedule.monthlyAnchorDay,
+                    monthlyLastDay = schedule.monthlyLastDay,
+                ).apply {
+                    this.household = household
+                    this.createdBy = user
+                }
+            )
+        }
+
+        val normalizedTask = task.copy(dueAt = normalizedDueAt)
+        val savedTask = taskRepository.save(
+            normalizedTask.toTaskEntity(user, household).apply {
+                this.taskPlan = taskPlan
+            }
+        )
 
         // запись TASK_CREATED в ленту активности
         activityService.createActivityRecord(
@@ -185,7 +205,7 @@ class TaskServiceImpl(
 
     // нельзя менять условия задачи если она взята в работу (забронена) или выполнена
     // только создатель может менять задачу
-    override fun updateTask(taskId: UUID, newTask: TaskRegisterDTO): TaskResponseDTO {
+    override fun updateTask(taskId: UUID, newTask: TaskUpdateDTO): TaskResponseDTO {
         // юзер + хозяйство и участие из задачи
         val user = getCurrentUser()
 
@@ -213,11 +233,16 @@ class TaskServiceImpl(
         if (task.createdBy.id != user.id)
             throw BusinessConflictException("Only creator can update task")
 
-        // обновляем (название/описание/награду) и сохранем
+        val normalizedDueAt = dueAtNormalizer.normalize(newTask.dueAt)
+        if (task.taskPlan != null && normalizedDueAt != null && normalizedDueAt != task.dueAt)
+            throw BusinessConflictException("Recurring task due date cannot be changed")
+
+        // Изменения экземпляра повторяющейся задачи не изменяют параметры плана.
         task.title = newTask.title
         task.description = newTask.description
         task.reward = newTask.reward
-        task.dueAt = normalizeDueAt(newTask.dueAt)
+        if (task.taskPlan == null)
+            task.dueAt = normalizedDueAt
 
 //        return taskRepository.save(task).toDto() // managed entity
         return task.toDto(LocalDateTime.now(clock))

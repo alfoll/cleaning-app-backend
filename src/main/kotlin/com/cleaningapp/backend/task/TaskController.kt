@@ -24,7 +24,7 @@ class TaskController(
     @PostMapping("/households/{householdId}/tasks")
     @ResponseStatus(HttpStatus.CREATED)
     fun createTask(@PathVariable householdId: UUID,
-                   @Valid @RequestBody task: TaskRegisterDTO,): TaskResponseDTO =
+                   @Valid @RequestBody task: TaskCreateDTO,): TaskResponseDTO =
         taskService.createTask(householdId, task)
 
     // показать список задач с фильтрацией - GET /api/households/{householdId}/tasks
@@ -44,7 +44,7 @@ class TaskController(
     // обновить свободную задачу - PUT /api/tasks/{taskId}
     @PutMapping("/tasks/{taskId}")
     fun updateTask(@PathVariable taskId: UUID,
-                   @Valid @RequestBody newTask: TaskRegisterDTO): TaskResponseDTO =
+                   @Valid @RequestBody newTask: TaskUpdateDTO): TaskResponseDTO =
         taskService.updateTask(taskId, newTask)
 
     // удалить свободную задачу - DELETE /api/tasks/{taskId}

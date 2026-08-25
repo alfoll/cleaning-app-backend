@@ -77,7 +77,7 @@ class TaskServiceIntegrationTest : BaseIntegrationTest() {
         when (operation) {
             TaskOperation.UPDATE -> taskService.updateTask(
                 taskId = taskId,
-                newTask = TaskRegisterDTO(
+                newTask = TaskUpdateDTO(
                     title = "Updated task",
                     description = "Updated description",
                     reward = 30,
@@ -113,7 +113,7 @@ class TaskServiceIntegrationTest : BaseIntegrationTest() {
 
         val result = taskService.createTask(
             householdId = household.id!!,
-            task = TaskRegisterDTO(
+            task = TaskCreateDTO(
                 title = "Wash dishes",
                 description = "Wash all dishes after dinner",
                 reward = 20,
@@ -132,6 +132,9 @@ class TaskServiceIntegrationTest : BaseIntegrationTest() {
         assertThat(result.description).isEqualTo("Wash all dishes after dinner")
         assertThat(result.reward).isEqualTo(20)
         assertThat(result.dueAt).isNull()
+        assertThat(result.taskPlanId).isNull()
+        assertThat(result.recurrenceType).isNull()
+        assertThat(result.recurrenceActive).isFalse()
         assertThat(result.isAssigned).isFalse()
         assertThat(result.assignedTo).isNull()
         assertThat(result.isCompleted).isFalse()
@@ -160,7 +163,7 @@ class TaskServiceIntegrationTest : BaseIntegrationTest() {
 
         val result = taskService.createTask(
             householdId = household.id!!,
-            task = TaskRegisterDTO(
+            task = TaskCreateDTO(
                 title = "Future task",
                 reward = 20,
                 dueAt = dueDate.atTime(12, 30),
@@ -189,7 +192,7 @@ class TaskServiceIntegrationTest : BaseIntegrationTest() {
 
         val result = taskService.createTask(
             householdId = household.id!!,
-            task = TaskRegisterDTO(
+            task = TaskCreateDTO(
                 title = "Today task",
                 reward = 20,
                 dueAt = today.atStartOfDay(),
@@ -210,7 +213,7 @@ class TaskServiceIntegrationTest : BaseIntegrationTest() {
         assertThatThrownBy {
             taskService.createTask(
                 householdId = household.id!!,
-                task = TaskRegisterDTO(
+                task = TaskCreateDTO(
                     title = "Past task",
                     reward = 20,
                     dueAt = LocalDate.now(clock).minusDays(1).atTime(23, 59),
@@ -239,7 +242,7 @@ class TaskServiceIntegrationTest : BaseIntegrationTest() {
         assertThatThrownBy {
             taskService.createTask(
                 householdId = household.id!!,
-                task = TaskRegisterDTO(
+                task = TaskCreateDTO(
                     title = "Foreign task",
                     description = null,
                     reward = 20,
@@ -266,7 +269,7 @@ class TaskServiceIntegrationTest : BaseIntegrationTest() {
         assertThatThrownBy {
             taskService.createTask(
                 householdId = household.id!!,
-                task = TaskRegisterDTO(
+                task = TaskCreateDTO(
                     title = "Inactive household task",
                     description = null,
                     reward = 20,
@@ -290,7 +293,7 @@ class TaskServiceIntegrationTest : BaseIntegrationTest() {
         assertThatThrownBy {
             taskService.createTask(
                 householdId = household.id!!,
-                task = TaskRegisterDTO(
+                task = TaskCreateDTO(
                     title = "Inactive membership task",
                     description = null,
                     reward = 20,
@@ -317,7 +320,7 @@ class TaskServiceIntegrationTest : BaseIntegrationTest() {
 
         val result = taskService.updateTask(
             taskId = task.id!!,
-            newTask = TaskRegisterDTO(
+            newTask = TaskUpdateDTO(
                 title = "Updated task",
                 description = "Updated description",
                 reward = 30,
@@ -350,7 +353,7 @@ class TaskServiceIntegrationTest : BaseIntegrationTest() {
 
         val result = taskService.updateTask(
             taskId = task.id!!,
-            newTask = TaskRegisterDTO(
+            newTask = TaskUpdateDTO(
                 title = task.title,
                 description = task.description,
                 reward = task.reward,
@@ -383,7 +386,7 @@ class TaskServiceIntegrationTest : BaseIntegrationTest() {
 
         val result = taskService.updateTask(
             taskId = task.id!!,
-            newTask = TaskRegisterDTO(
+            newTask = TaskUpdateDTO(
                 title = task.title,
                 description = task.description,
                 reward = task.reward,
@@ -414,7 +417,7 @@ class TaskServiceIntegrationTest : BaseIntegrationTest() {
 
         val result = taskService.updateTask(
             taskId = task.id!!,
-            newTask = TaskRegisterDTO(
+            newTask = TaskUpdateDTO(
                 title = task.title,
                 description = task.description,
                 reward = task.reward,
@@ -448,7 +451,7 @@ class TaskServiceIntegrationTest : BaseIntegrationTest() {
         assertThatThrownBy {
             taskService.updateTask(
                 taskId = task.id!!,
-                newTask = TaskRegisterDTO(
+                newTask = TaskUpdateDTO(
                     title = "Illegal update",
                     description = null,
                     reward = 25,
@@ -474,7 +477,7 @@ class TaskServiceIntegrationTest : BaseIntegrationTest() {
         assertThatThrownBy {
             taskService.updateTask(
                 taskId = task.id!!,
-                newTask = TaskRegisterDTO(
+                newTask = TaskUpdateDTO(
                     title = "Cannot update assigned",
                     description = null,
                     reward = 25,
@@ -500,7 +503,7 @@ class TaskServiceIntegrationTest : BaseIntegrationTest() {
         assertThatThrownBy {
             taskService.updateTask(
                 taskId = task.id!!,
-                newTask = TaskRegisterDTO(
+                newTask = TaskUpdateDTO(
                     title = "Cannot update completed",
                     description = null,
                     reward = 25,
@@ -517,7 +520,7 @@ class TaskServiceIntegrationTest : BaseIntegrationTest() {
         assertThatThrownBy {
             taskService.updateTask(
                 taskId = UUID.randomUUID(),
-                newTask = TaskRegisterDTO(
+                newTask = TaskUpdateDTO(
                     title = "Missing task",
                     description = null,
                     reward = 20,

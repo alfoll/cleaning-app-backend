@@ -15,6 +15,9 @@ fun TaskEntity.toDto(now: LocalDateTime): TaskResponseDTO = TaskResponseDTO(
     description = description,
     reward = reward,
     dueAt = dueAt,
+    taskPlanId = taskPlan?.id,
+    recurrenceType = taskPlan?.recurrenceType,
+    recurrenceActive = taskPlan?.isActive == true,
 
     isAssigned = assignedTo != null,
     assignedTo = assignedTo?.user?.id, // может быть null (никем не забронирована), на фронт передаю именно ЮЗЕРА
@@ -27,7 +30,7 @@ fun TaskEntity.toDto(now: LocalDateTime): TaskResponseDTO = TaskResponseDTO(
     isOverdue = !isCompleted && dueAt?.isBefore(now) == true,
 )
 
-fun TaskRegisterDTO.toTaskEntity(creator: UserEntity, household: HouseholdEntity): TaskEntity =
+fun TaskCreateDTO.toTaskEntity(creator: UserEntity, household: HouseholdEntity): TaskEntity =
     TaskEntity(
         title = title,
         description = description,

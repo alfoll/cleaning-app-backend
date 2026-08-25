@@ -1,5 +1,6 @@
 package com.cleaningapp.backend.task
 
+import com.cleaningapp.backend.taskplan.RecurrenceType
 import java.time.LocalDateTime
 import java.util.UUID
 
@@ -13,6 +14,9 @@ data class TaskResponseDTO(
     val description: String? = null,
     val reward: Int,
     val dueAt: LocalDateTime?,
+    val taskPlanId: UUID?,
+    val recurrenceType: RecurrenceType?,
+    val recurrenceActive: Boolean,
 
     val isAssigned: Boolean = false, // в сущности нет, только в дто для облегчения
     val assignedTo: UUID? = null, // в реальности UserHousehold.id, но тут отдается User.id

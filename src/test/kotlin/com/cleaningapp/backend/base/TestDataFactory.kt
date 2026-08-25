@@ -9,6 +9,10 @@ import com.cleaningapp.backend.privilege.PrivilegeEntity
 import com.cleaningapp.backend.privilege.PrivilegeRepository
 import com.cleaningapp.backend.task.TaskEntity
 import com.cleaningapp.backend.task.TaskRepository
+import com.cleaningapp.backend.task.TaskDueDatePolicy
+import com.cleaningapp.backend.taskplan.RecurrenceType
+import com.cleaningapp.backend.taskplan.TaskPlanEntity
+import com.cleaningapp.backend.taskplan.TaskPlanRepository
 import com.cleaningapp.backend.tasktemplate.TaskTemplateEntity
 import com.cleaningapp.backend.tasktemplate.TaskTemplateRepository
 import com.cleaningapp.backend.transaction.TransactionEntity
@@ -22,6 +26,7 @@ import jakarta.persistence.EntityManager
 import org.springframework.boot.test.context.TestComponent
 import org.springframework.jdbc.core.JdbcTemplate
 import java.time.Clock
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.util.UUID
 
@@ -35,6 +40,7 @@ class TestDataFactory(
     private val householdRepository: HouseholdRepository,
     private val userHouseholdRepository: UserHouseholdRepository,
     private val taskRepository: TaskRepository,
+    private val taskPlanRepository: TaskPlanRepository,
     private val taskTemplateRepository: TaskTemplateRepository,
     private val privilegeRepository: PrivilegeRepository,
     private val transactionRepository: TransactionRepository,
@@ -63,6 +69,17 @@ class TestDataFactory(
     ) {
         require(task.household.id == household.id) {
             "Task ${task.id} belongs to household ${task.household.id}, but expected ${household.id}"
+        }
+    }
+    // проверка принадлежности плана хозяйству
+    private fun requireSameHousehold(
+        household: HouseholdEntity,
+        taskPlan: TaskPlanEntity?,
+    ) {
+        if (taskPlan == null) return
+
+        require(taskPlan.household.id == household.id) {
+            "Task plan ${taskPlan.id} belongs to household ${taskPlan.household.id}, but expected ${household.id}"
         }
     }
     // проверка принадлежности привилегии хозяйству
@@ -155,6 +172,7 @@ class TestDataFactory(
         description: String? = "Test task description",
         reward: Int = 20,
         dueAt: LocalDateTime? = null,
+        taskPlan: TaskPlanEntity? = null,
 
         assignedTo: UserHouseholdEntity? = null,
         assignedAt: LocalDateTime? = if (assignedTo != null) LocalDateTime.now(clock) else null,
@@ -166,6 +184,7 @@ class TestDataFactory(
 
         requireSameHousehold(household, assignedTo)
         requireSameHousehold(household, completedBy)
+        requireSameHousehold(household, taskPlan)
 
         require((assignedTo == null) == (assignedAt == null)) {
             "assignedTo and assignedAt must be both null or both not null"
@@ -202,6 +221,7 @@ class TestDataFactory(
         task.createdBy = createdBy
         task.assignedTo = assignedTo
         task.completedBy = completedBy
+        task.taskPlan = taskPlan
 
         return taskRepository.save(task)
     }
@@ -212,12 +232,14 @@ class TestDataFactory(
         createdBy: UserEntity = household.createdByUser,
         reward: Int = 20,
         dueAt: LocalDateTime? = null,
+        taskPlan: TaskPlanEntity? = null,
 ): TaskEntity =
         createTestTask(
             household = household,
             createdBy = createdBy,
             reward = reward,
             dueAt = dueAt,
+            taskPlan = taskPlan,
             assignedTo = null,
             assignedAt = null,
             isCompleted = false,
@@ -232,6 +254,7 @@ class TestDataFactory(
         reward: Int = 20,
         assignedTo: UserHouseholdEntity,
         dueAt: LocalDateTime? = null,
+        taskPlan: TaskPlanEntity? = null,
     ): TaskEntity {
 
         requireSameHousehold(household, assignedTo)
@@ -241,6 +264,7 @@ class TestDataFactory(
             createdBy = createdBy,
             reward = reward,
             dueAt = dueAt,
+            taskPlan = taskPlan,
             assignedTo = assignedTo,
             assignedAt = LocalDateTime.now(clock),
             isCompleted = false,
@@ -256,6 +280,7 @@ class TestDataFactory(
         reward: Int = 20,
         completedBy: UserHouseholdEntity,
         dueAt: LocalDateTime? = null,
+        taskPlan: TaskPlanEntity? = null,
     ): TaskEntity {
 
         requireSameHousehold(household, completedBy)
@@ -265,12 +290,45 @@ class TestDataFactory(
             createdBy = createdBy,
             reward = reward,
             dueAt = dueAt,
+            taskPlan = taskPlan,
             assignedTo = null,
             assignedAt = null,
             isCompleted = true,
             completedBy = completedBy,
             completedAt = LocalDateTime.now(clock),
         )
+    }
+
+    fun createTestTaskPlan(
+        household: HouseholdEntity,
+        createdBy: UserEntity = household.createdByUser,
+        title: String = "Test task plan",
+        description: String? = "Test task plan description",
+        reward: Int = 20,
+        recurrenceType: RecurrenceType = RecurrenceType.DAILY,
+        nextDueAt: LocalDateTime = TaskDueDatePolicy.endOfDay(LocalDate.now(clock).plusDays(1)),
+        monthlyAnchorDay: Int? = if (recurrenceType == RecurrenceType.MONTHLY) 15 else null,
+        monthlyLastDay: Boolean = false,
+        isActive: Boolean = true,
+    ): TaskPlanEntity {
+        require(reward in 5..100) {
+            "reward must be between 5 and 100"
+        }
+
+        val taskPlan = TaskPlanEntity(
+            title = title,
+            description = description,
+            reward = reward,
+            recurrenceType = recurrenceType,
+            nextDueAt = nextDueAt,
+            monthlyAnchorDay = monthlyAnchorDay,
+            monthlyLastDay = monthlyLastDay,
+            isActive = isActive,
+        )
+        taskPlan.household = household
+        taskPlan.createdBy = createdBy
+
+        return taskPlanRepository.save(taskPlan)
     }
 
     fun createTestTaskTemplate(

@@ -9,6 +9,7 @@ import com.cleaningapp.backend.exception.HouseholdNotFoundException
 import com.cleaningapp.backend.exception.MembershipNotFoundException
 import com.cleaningapp.backend.privilege.PrivilegeRepository
 import com.cleaningapp.backend.task.TaskRepository
+import com.cleaningapp.backend.taskplan.TaskPlanRepository
 import com.cleaningapp.backend.tasktemplate.TaskTemplateRepository
 import com.cleaningapp.backend.transaction.TransactionRepository
 import com.cleaningapp.backend.userhousehold.UserHouseholdRepository
@@ -35,6 +36,9 @@ class HouseholdServiceIntegrationTest : BaseIntegrationTest() {
 
     @Autowired
     private lateinit var taskRepository: TaskRepository
+
+    @Autowired
+    private lateinit var taskPlanRepository: TaskPlanRepository
 
     @Autowired
     private lateinit var taskTemplateRepository: TaskTemplateRepository
@@ -173,10 +177,16 @@ class HouseholdServiceIntegrationTest : BaseIntegrationTest() {
             balance = 100,
         )
 
+        val taskPlan = testDataFactory.createTestTaskPlan(
+            household = household,
+            createdBy = user,
+        )
+
         val task = testDataFactory.createTestCompletedTask(
             household = household,
             createdBy = user,
             completedBy = membership,
+            taskPlan = taskPlan,
         )
 
         val privilege = testDataFactory.createTestPrivilege(
@@ -217,6 +227,7 @@ class HouseholdServiceIntegrationTest : BaseIntegrationTest() {
         assertThat(deletedMembership.balance).isZero()
 
         assertThat(taskRepository.findById(task.id!!)).isEmpty
+        assertThat(taskPlanRepository.findById(taskPlan.id!!)).isEmpty
         assertThat(taskTemplateRepository.findById(taskTemplate.id!!)).isEmpty
         assertThat(privilegeRepository.findById(privilege.id!!)).isEmpty
 

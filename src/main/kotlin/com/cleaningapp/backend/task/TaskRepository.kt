@@ -14,6 +14,16 @@ import java.time.LocalDateTime
 interface TaskRepository: JpaRepository<TaskEntity, UUID> {
 
     // задачи хозяйства (сорт по созданию сначалп последние)
+    @EntityGraph(
+        attributePaths = [
+            "createdBy",
+            "assignedTo",
+            "assignedTo.user",
+            "completedBy",
+            "completedBy.user",
+            "taskPlan",
+        ]
+    )
     fun findAllByHouseholdIdOrderByCreatedAtDesc(
         householdId: UUID
     ): List<TaskEntity>
@@ -24,7 +34,8 @@ interface TaskRepository: JpaRepository<TaskEntity, UUID> {
             "assignedTo",
             "assignedTo.user",
             "completedBy",
-            "completedBy.user"
+            "completedBy.user",
+            "taskPlan",
         ]
     )
     fun findAllByHouseholdIdOrderByCreatedAtDesc(
@@ -44,7 +55,8 @@ interface TaskRepository: JpaRepository<TaskEntity, UUID> {
             "assignedTo",
             "assignedTo.user",
             "completedBy",
-            "completedBy.user"
+            "completedBy.user",
+            "taskPlan",
         ]
     )
     fun findAllByHouseholdIdAndIsCompletedTrueOrderByCompletedAtDesc(
@@ -69,7 +81,8 @@ interface TaskRepository: JpaRepository<TaskEntity, UUID> {
             "assignedTo",
             "assignedTo.user",
             "completedBy",
-            "completedBy.user"
+            "completedBy.user",
+            "taskPlan",
         ]
     )
     fun findAllByHouseholdIdAndAssignedToIdAndIsCompletedFalseOrderByAssignedAtDesc(
@@ -90,7 +103,8 @@ interface TaskRepository: JpaRepository<TaskEntity, UUID> {
             "assignedTo",
             "assignedTo.user",
             "completedBy",
-            "completedBy.user"
+            "completedBy.user",
+            "taskPlan",
         ]
     )
     fun findAllByHouseholdIdAndAssignedToIsNullAndIsCompletedFalseOrderByCreatedAtDesc(
@@ -104,7 +118,8 @@ interface TaskRepository: JpaRepository<TaskEntity, UUID> {
             "assignedTo",
             "assignedTo.user",
             "completedBy",
-            "completedBy.user"
+            "completedBy.user",
+            "taskPlan",
         ]
     )
     fun findAllByHouseholdIdAndIsCompletedFalseAndDueAtIsNotNullOrderByDueAtAsc(
@@ -118,7 +133,8 @@ interface TaskRepository: JpaRepository<TaskEntity, UUID> {
             "assignedTo",
             "assignedTo.user",
             "completedBy",
-            "completedBy.user"
+            "completedBy.user",
+            "taskPlan",
         ]
     )
     fun findAllByHouseholdIdAndIsCompletedFalseAndDueAtIsNotNullAndDueAtBeforeOrderByDueAtAsc(

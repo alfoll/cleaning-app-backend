@@ -5,9 +5,9 @@ import java.util.UUID
 interface TaskService {
 
     // создать задачу
-    fun createTask(householdId: UUID, task: TaskRegisterDTO): TaskResponseDTO
+    fun createTask(householdId: UUID, task: TaskCreateDTO): TaskResponseDTO
     // обновить задачу
-    fun updateTask(taskId: UUID, newTask: TaskRegisterDTO): TaskResponseDTO
+    fun updateTask(taskId: UUID, newTask: TaskUpdateDTO): TaskResponseDTO
     // удалить задачу
     fun deleteTask(taskId: UUID)
 
