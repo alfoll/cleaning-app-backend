@@ -9,6 +9,7 @@ import com.cleaningapp.backend.exception.TaskPlanNotFoundException
 import com.cleaningapp.backend.exception.UserNotActiveException
 import com.cleaningapp.backend.exception.UserNotFoundException
 import com.cleaningapp.backend.household.HouseholdRepository
+import com.cleaningapp.backend.task.TaskRepository
 import com.cleaningapp.backend.user.UserEntity
 import com.cleaningapp.backend.user.UserRepository
 import com.cleaningapp.backend.userhousehold.UserHouseholdRepository
@@ -25,9 +26,59 @@ class TaskPlanServiceImpl(
     private val userRepository: UserRepository,
     private val householdRepository: HouseholdRepository,
     private val userHouseholdRepository: UserHouseholdRepository,
+    private val taskRepository: TaskRepository,
+    private val recurrenceCalculator: TaskPlanRecurrenceCalculator,
 ) : TaskPlanService {
 
+    override fun updateRecurrence(taskPlanId: UUID, recurrenceType: RecurrenceType) {
+        val taskPlan = getActiveOwnedTaskPlanForUpdate(
+            taskPlanId = taskPlanId,
+            creatorConflictMessage = "Only creator can update task plan",
+            inactiveConflictMessage = "Inactive task plan cannot be updated",
+        )
+
+        if (taskPlan.recurrenceType == recurrenceType)
+            return
+
+        val unfinishedTask = taskRepository.findByTaskPlanIdAndIsCompletedFalse(taskPlanId)
+
+        if (unfinishedTask != null) {
+            val dueAt = checkNotNull(unfinishedTask.dueAt) {
+                "Recurring task must have a due date"
+            }
+            val schedule = recurrenceCalculator.createSchedule(dueAt, recurrenceType)
+
+            taskPlan.nextDueAt = schedule.nextDueAt
+            taskPlan.monthlyAnchorDay = schedule.monthlyAnchorDay
+            taskPlan.monthlyLastDay = schedule.monthlyLastDay
+        } else {
+            val metadata = recurrenceCalculator.createRecurrenceMetadata(
+                referenceAt = taskPlan.nextDueAt,
+                recurrenceType = recurrenceType,
+            )
+
+            taskPlan.monthlyAnchorDay = metadata.monthlyAnchorDay
+            taskPlan.monthlyLastDay = metadata.monthlyLastDay
+        }
+
+        taskPlan.recurrenceType = recurrenceType
+    }
+
     override fun cancelTaskPlan(taskPlanId: UUID) {
+        val taskPlan = getActiveOwnedTaskPlanForUpdate(
+            taskPlanId = taskPlanId,
+            creatorConflictMessage = "Only creator can cancel task plan",
+            inactiveConflictMessage = "Task plan is already inactive",
+        )
+
+        taskPlan.isActive = false
+    }
+
+    private fun getActiveOwnedTaskPlanForUpdate(
+        taskPlanId: UUID,
+        creatorConflictMessage: String,
+        inactiveConflictMessage: String,
+    ): TaskPlanEntity {
         val currentUser = getCurrentUser()
         val householdId = taskPlanRepository.findHouseholdIdByTaskPlanId(taskPlanId)
             ?: throw TaskPlanNotFoundException()
@@ -50,11 +101,11 @@ class TaskPlanServiceImpl(
         if (taskPlan.household.id != household.id)
             throw BusinessConflictException("Task plan does not belong to this household")
         if (taskPlan.createdBy.id != currentUser.id)
-            throw BusinessConflictException("Only creator can cancel task plan")
+            throw BusinessConflictException(creatorConflictMessage)
         if (!taskPlan.isActive)
-            throw BusinessConflictException("Task plan is already inactive")
+            throw BusinessConflictException(inactiveConflictMessage)
 
-        taskPlan.isActive = false
+        return taskPlan
     }
 
     private fun getCurrentUser(): UserEntity {

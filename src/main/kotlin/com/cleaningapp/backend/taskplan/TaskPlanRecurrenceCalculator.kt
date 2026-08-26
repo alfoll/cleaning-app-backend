@@ -12,6 +12,11 @@ data class TaskPlanSchedule(
     val monthlyLastDay: Boolean,
 )
 
+data class TaskPlanRecurrenceMetadata(
+    val monthlyAnchorDay: Int?,
+    val monthlyLastDay: Boolean,
+)
+
 @Component
 class TaskPlanRecurrenceCalculator {
 
@@ -19,22 +24,36 @@ class TaskPlanRecurrenceCalculator {
         firstDueAt: LocalDateTime,
         recurrenceType: RecurrenceType,
     ): TaskPlanSchedule {
-        val firstDueDate = firstDueAt.toLocalDate()
-        val monthlyLastDay = recurrenceType == RecurrenceType.MONTHLY && firstDueDate.isLastDayOfMonth()
-        val monthlyAnchorDay = if (recurrenceType == RecurrenceType.MONTHLY && !monthlyLastDay) {
-            firstDueDate.dayOfMonth
-        } else {
-            null
-        }
+        val metadata = createRecurrenceMetadata(firstDueAt, recurrenceType)
 
         return TaskPlanSchedule(
             nextDueAt = calculateNextDueAt(
                 currentDueAt = firstDueAt,
                 recurrenceType = recurrenceType,
-                monthlyAnchorDay = monthlyAnchorDay,
-                monthlyLastDay = monthlyLastDay,
+                monthlyAnchorDay = metadata.monthlyAnchorDay,
+                monthlyLastDay = metadata.monthlyLastDay,
             ),
-            monthlyAnchorDay = monthlyAnchorDay,
+            monthlyAnchorDay = metadata.monthlyAnchorDay,
+            monthlyLastDay = metadata.monthlyLastDay,
+        )
+    }
+
+    fun createRecurrenceMetadata(
+        referenceAt: LocalDateTime,
+        recurrenceType: RecurrenceType,
+    ): TaskPlanRecurrenceMetadata {
+        if (recurrenceType != RecurrenceType.MONTHLY) {
+            return TaskPlanRecurrenceMetadata(
+                monthlyAnchorDay = null,
+                monthlyLastDay = false,
+            )
+        }
+
+        val referenceDate = referenceAt.toLocalDate()
+        val monthlyLastDay = referenceDate.isLastDayOfMonth()
+
+        return TaskPlanRecurrenceMetadata(
+            monthlyAnchorDay = referenceDate.dayOfMonth.takeUnless { monthlyLastDay },
             monthlyLastDay = monthlyLastDay,
         )
     }

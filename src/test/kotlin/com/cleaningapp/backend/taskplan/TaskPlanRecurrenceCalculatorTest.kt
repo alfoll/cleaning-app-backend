@@ -124,6 +124,30 @@ class TaskPlanRecurrenceCalculatorTest {
     }
 
     @Test
+    fun `monthly metadata should be derived without advancing reference due date`() {
+        val metadata = calculator.createRecurrenceMetadata(
+            referenceAt = endOfDay(LocalDate.of(2026, 1, 31)),
+            recurrenceType = RecurrenceType.MONTHLY,
+        )
+
+        assertThat(metadata.monthlyAnchorDay).isNull()
+        assertThat(metadata.monthlyLastDay).isTrue()
+    }
+
+    @Test
+    fun `non monthly metadata should clear monthly state`() {
+        listOf(RecurrenceType.DAILY, RecurrenceType.WEEKLY).forEach { recurrenceType ->
+            val metadata = calculator.createRecurrenceMetadata(
+                referenceAt = endOfDay(LocalDate.of(2026, 1, 30)),
+                recurrenceType = recurrenceType,
+            )
+
+            assertThat(metadata.monthlyAnchorDay).isNull()
+            assertThat(metadata.monthlyLastDay).isFalse()
+        }
+    }
+
+    @Test
     fun `overdue daily completion should restart schedule from completion date`() {
         val schedule = calculator.recalculateAfterOverdueCompletion(
             completedAt = LocalDate.of(2026, 9, 13).atTime(10, 30),

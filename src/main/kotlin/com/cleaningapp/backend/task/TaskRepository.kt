@@ -15,6 +15,8 @@ interface TaskRepository: JpaRepository<TaskEntity, UUID> {
 
     fun existsByTaskPlanIdAndIsCompletedFalse(taskPlanId: UUID): Boolean
 
+    fun findByTaskPlanIdAndIsCompletedFalse(taskPlanId: UUID): TaskEntity?
+
     fun findAllByTaskPlanId(taskPlanId: UUID): List<TaskEntity>
 
     // задачи хозяйства (сорт по созданию сначалп последние)

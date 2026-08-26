@@ -10,6 +10,7 @@ import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
@@ -148,6 +149,44 @@ class TaskPlanControllerIntegrationTest : BaseIntegrationTest() {
 
         assertThat(taskPlanRepository.findById(taskPlan.id!!)).isPresent
         assertThat(taskPlanRepository.findById(taskPlan.id!!).orElseThrow().isActive).isFalse()
+    }
+
+    @Test
+    fun `update task plan recurrence endpoint should return 204 and update future schedule`() {
+        val user = createLocalUserForValidToken()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+        testDataFactory.createTestMembership(user = user, household = household)
+        val currentDueAt = TaskDueDatePolicy.endOfDay(LocalDate.of(2026, 9, 10))
+        val taskPlan = testDataFactory.createTestTaskPlan(
+            household = household,
+            createdBy = user,
+            recurrenceType = RecurrenceType.DAILY,
+        )
+        testDataFactory.createTestFreeTask(
+            household = household,
+            createdBy = user,
+            dueAt = currentDueAt,
+            taskPlan = taskPlan,
+        )
+
+        mockMvc.perform(
+            patch("/api/task-plans/${taskPlan.id}")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $validToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"recurrenceType":"WEEKLY"}""")
+        ).andExpect(status().isNoContent)
+
+        mockMvc.perform(
+            patch("/api/task-plans/${taskPlan.id}")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $validToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"recurrenceType":"WEEKLY"}""")
+        ).andExpect(status().isNoContent)
+
+        val savedPlan = taskPlanRepository.findById(taskPlan.id!!).orElseThrow()
+        assertThat(savedPlan.recurrenceType).isEqualTo(RecurrenceType.WEEKLY)
+        assertThat(savedPlan.nextDueAt)
+            .isEqualTo(TaskDueDatePolicy.endOfDay(LocalDate.of(2026, 9, 17)))
     }
 
     @Test
