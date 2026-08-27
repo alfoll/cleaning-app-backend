@@ -767,6 +767,8 @@ class TaskServiceIntegrationTest : BaseIntegrationTest() {
 
     @Test
     fun `assignTask should assign free task to current member and create activity`() {
+        val assignedAt = LocalDateTime.of(2026, 8, 27, 9, 45)
+        testClock.setCurrentDateTime(assignedAt)
         val user = createLocalUserForValidToken()
         val household = testDataFactory.createTestHousehold(createdBy = user)
         val membership = testDataFactory.createTestMembership(user = user, household = household)
@@ -788,11 +790,11 @@ class TaskServiceIntegrationTest : BaseIntegrationTest() {
 
         assertThat(result.isAssigned).isTrue()
         assertThat(result.assignedTo).isEqualTo(user.id)
-        assertThat(result.assignedAt).isNotNull()
+        assertThat(result.assignedAt).isEqualTo(assignedAt)
         assertThat(result.isCompleted).isFalse()
 
         assertThat(updatedTask.assignedTo?.id).isEqualTo(membership.id)
-        assertThat(updatedTask.assignedAt).isNotNull()
+        assertThat(updatedTask.assignedAt).isEqualTo(assignedAt)
 
         assertThat(activities.map { it.activityType })
             .contains(ActivityType.TASK_ASSIGNED)

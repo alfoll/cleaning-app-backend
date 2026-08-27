@@ -10,6 +10,34 @@ import org.springframework.data.repository.query.Param
 import java.util.UUID
 
 interface TaskTemplateRepository : JpaRepository<TaskTemplateEntity, UUID> {
+    @Modifying(flushAutomatically = true, clearAutomatically = false)
+    @Query(
+        """
+        update TaskTemplateEntity t
+        set t.isActive = false,
+            t.version = t.version + 1
+        where t.household.id = :householdId
+          and t.createdBy.id = :createdById
+          and t.isActive = true
+        """
+    )
+    fun deactivateActiveTemplatesByHouseholdIdAndCreatedById(
+        @Param("householdId") householdId: UUID,
+        @Param("createdById") createdById: UUID,
+    ): Int
+
+    @Query(
+        """
+        select distinct t.household.id
+        from TaskTemplateEntity t
+        where t.createdBy.id = :createdById
+          and t.isActive = true
+        """
+    )
+    fun findActiveTemplateHouseholdIdsByCreatedById(
+        @Param("createdById") createdById: UUID,
+    ): List<UUID>
+
     @EntityGraph(attributePaths = ["household", "createdBy"])
     fun findAllByHouseholdIdAndIsActiveTrueOrderByCreatedAtDesc(
         householdId: UUID,

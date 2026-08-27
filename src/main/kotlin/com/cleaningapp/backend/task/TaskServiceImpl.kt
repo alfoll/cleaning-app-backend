@@ -341,7 +341,7 @@ class TaskServiceImpl(
 
         // бронируем за собой
         task.assignedTo = membership
-        task.assignedAt = LocalDateTime.now()
+        task.assignedAt = LocalDateTime.now(clock)
 
         // создаем запись TASK_ASSIGNED в ленте активности
         activityService.createActivityRecord(

@@ -5,6 +5,7 @@ import com.cleaningapp.backend.task.TaskDueDatePolicy
 import com.cleaningapp.backend.task.TaskRepository
 import com.cleaningapp.backend.taskplan.TaskPlanGenerationService
 import com.cleaningapp.backend.taskplan.TaskPlanRepository
+import com.cleaningapp.backend.tasktemplate.TaskTemplateRepository
 import com.cleaningapp.backend.userhousehold.UserHouseholdRepository
 import jakarta.persistence.EntityManager
 import org.assertj.core.api.Assertions.assertThat
@@ -29,6 +30,9 @@ class TaskPlanUserLifecycleIntegrationTest : BaseIntegrationTest() {
 
     @Autowired
     private lateinit var taskPlanRepository: TaskPlanRepository
+
+    @Autowired
+    private lateinit var taskTemplateRepository: TaskTemplateRepository
 
     @Autowired
     private lateinit var taskRepository: TaskRepository
@@ -78,6 +82,26 @@ class TaskPlanUserLifecycleIntegrationTest : BaseIntegrationTest() {
             household = secondHousehold,
             createdBy = secondOtherUser,
         )
+        val firstOwnedTemplate = testDataFactory.createTestTaskTemplate(
+            household = firstHousehold,
+            createdBy = deletedUser,
+        )
+        val secondOwnedTemplate = testDataFactory.createTestTaskTemplate(
+            household = secondHousehold,
+            createdBy = deletedUser,
+        )
+        val legacyOwnedTemplate = testDataFactory.createTestTaskTemplate(
+            household = legacyHousehold,
+            createdBy = deletedUser,
+        )
+        val otherOwnersFirstTemplate = testDataFactory.createTestTaskTemplate(
+            household = firstHousehold,
+            createdBy = firstOtherUser,
+        )
+        val otherOwnersSecondTemplate = testDataFactory.createTestTaskTemplate(
+            household = secondHousehold,
+            createdBy = secondOtherUser,
+        )
         val unfinishedTask = testDataFactory.createTestFreeTask(
             household = firstHousehold,
             createdBy = deletedUser,
@@ -98,6 +122,11 @@ class TaskPlanUserLifecycleIntegrationTest : BaseIntegrationTest() {
         assertThat(taskPlanRepository.findById(legacyOwnedPlan.id!!).orElseThrow().isActive).isFalse()
         assertThat(taskPlanRepository.findById(otherOwnersFirstPlan.id!!).orElseThrow().isActive).isTrue()
         assertThat(taskPlanRepository.findById(otherOwnersSecondPlan.id!!).orElseThrow().isActive).isTrue()
+        assertThat(taskTemplateRepository.findById(firstOwnedTemplate.id!!).orElseThrow().isActive).isFalse()
+        assertThat(taskTemplateRepository.findById(secondOwnedTemplate.id!!).orElseThrow().isActive).isFalse()
+        assertThat(taskTemplateRepository.findById(legacyOwnedTemplate.id!!).orElseThrow().isActive).isFalse()
+        assertThat(taskTemplateRepository.findById(otherOwnersFirstTemplate.id!!).orElseThrow().isActive).isTrue()
+        assertThat(taskTemplateRepository.findById(otherOwnersSecondTemplate.id!!).orElseThrow().isActive).isTrue()
         assertThat(taskRepository.findById(unfinishedTask.id!!)).isPresent
 
         generationService.generateDueTasks()

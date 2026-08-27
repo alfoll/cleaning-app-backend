@@ -5,6 +5,7 @@ import com.cleaningapp.backend.activity.ActivityType
 import com.cleaningapp.backend.activity.RecordActivityCommand
 import com.cleaningapp.backend.base.BaseConcurrencyIntegrationTest
 import com.cleaningapp.backend.taskplan.TaskPlanRepository
+import com.cleaningapp.backend.tasktemplate.TaskTemplateRepository
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
@@ -23,6 +24,9 @@ class TaskPlanMembershipLifecycleRollbackIntegrationTest : BaseConcurrencyIntegr
     @Autowired
     private lateinit var taskPlanRepository: TaskPlanRepository
 
+    @Autowired
+    private lateinit var taskTemplateRepository: TaskTemplateRepository
+
     @MockitoBean
     private lateinit var activityService: ActivityService
 
@@ -34,6 +38,7 @@ class TaskPlanMembershipLifecycleRollbackIntegrationTest : BaseConcurrencyIntegr
         val leavingMembership = testDataFactory.createTestMembership(user = leavingUser, household = household)
         testDataFactory.createTestMembership(user = otherUser, household = household)
         val plan = testDataFactory.createTestTaskPlan(household = household, createdBy = leavingUser)
+        val template = testDataFactory.createTestTaskTemplate(household = household, createdBy = leavingUser)
         val expectedActivity = RecordActivityCommand(
             householdId = household.id!!,
             memberId = leavingMembership.id!!,
@@ -52,5 +57,6 @@ class TaskPlanMembershipLifecycleRollbackIntegrationTest : BaseConcurrencyIntegr
 
         assertThat(userHouseholdRepository.findById(leavingMembership.id!!).orElseThrow().isUserActive).isTrue()
         assertThat(taskPlanRepository.findById(plan.id!!).orElseThrow().isActive).isTrue()
+        assertThat(taskTemplateRepository.findById(template.id!!).orElseThrow().isActive).isTrue()
     }
 }
