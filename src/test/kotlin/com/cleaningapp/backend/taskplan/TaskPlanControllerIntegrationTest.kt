@@ -60,10 +60,11 @@ class TaskPlanControllerIntegrationTest : BaseIntegrationTest() {
     }
 
     @Test
-    fun `create recurring task endpoint should reject missing due date`() {
+    fun `create recurring task endpoint should derive first due date when omitted`() {
         val user = createLocalUserForValidToken()
         val household = testDataFactory.createTestHousehold(createdBy = user)
         testDataFactory.createTestMembership(user = user, household = household)
+        val startDate = LocalDate.now(clock)
 
         mockMvc.perform(
             post("/api/households/${household.id}/tasks")
@@ -71,8 +72,18 @@ class TaskPlanControllerIntegrationTest : BaseIntegrationTest() {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"title":"Recurring task","reward":25,"recurrenceType":"WEEKLY"}""")
         )
-            .andExpect(status().isConflict)
-            .andExpect(jsonPath("$.error").value("409 BUSINESS_CONFLICT"))
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.taskPlanId").exists())
+            .andExpect(jsonPath("$.recurrenceType").value("WEEKLY"))
+            .andExpect(jsonPath("$.recurrenceActive").value(true))
+            .andExpect(
+                jsonPath("$.dueAt")
+                    .value(TaskDueDatePolicy.endOfDay(startDate.plusDays(7)).toString())
+            )
+
+        val plan = taskPlanRepository.findAll().single()
+        assertThat(plan.nextDueAt)
+            .isEqualTo(TaskDueDatePolicy.endOfDay(startDate.plusDays(14)))
     }
 
     @Test

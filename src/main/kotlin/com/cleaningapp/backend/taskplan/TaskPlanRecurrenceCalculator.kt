@@ -12,6 +12,13 @@ data class TaskPlanSchedule(
     val monthlyLastDay: Boolean,
 )
 
+data class TaskPlanCreationSchedule(
+    val firstDueAt: LocalDateTime,
+    val nextDueAt: LocalDateTime,
+    val monthlyAnchorDay: Int?,
+    val monthlyLastDay: Boolean,
+)
+
 data class TaskPlanRecurrenceMetadata(
     val monthlyAnchorDay: Int?,
     val monthlyLastDay: Boolean,
@@ -19,6 +26,32 @@ data class TaskPlanRecurrenceMetadata(
 
 @Component
 class TaskPlanRecurrenceCalculator {
+
+    fun createScheduleFromStartDate(
+        startDate: LocalDate,
+        recurrenceType: RecurrenceType,
+    ): TaskPlanCreationSchedule {
+        val startAt = TaskDueDatePolicy.endOfDay(startDate)
+        val metadata = createRecurrenceMetadata(startAt, recurrenceType)
+        val firstDueAt = calculateNextDueAt(
+            currentDueAt = startAt,
+            recurrenceType = recurrenceType,
+            monthlyAnchorDay = metadata.monthlyAnchorDay,
+            monthlyLastDay = metadata.monthlyLastDay,
+        )
+
+        return TaskPlanCreationSchedule(
+            firstDueAt = firstDueAt,
+            nextDueAt = calculateNextDueAt(
+                currentDueAt = firstDueAt,
+                recurrenceType = recurrenceType,
+                monthlyAnchorDay = metadata.monthlyAnchorDay,
+                monthlyLastDay = metadata.monthlyLastDay,
+            ),
+            monthlyAnchorDay = metadata.monthlyAnchorDay,
+            monthlyLastDay = metadata.monthlyLastDay,
+        )
+    }
 
     fun createSchedule(
         firstDueAt: LocalDateTime,

@@ -15,6 +15,7 @@ import com.cleaningapp.backend.exception.UserNotFoundException
 import com.cleaningapp.backend.household.HouseholdEntity
 import com.cleaningapp.backend.household.HouseholdRepository
 import com.cleaningapp.backend.taskplan.TaskPlanEntity
+import com.cleaningapp.backend.taskplan.TaskPlanCreationSchedule
 import com.cleaningapp.backend.taskplan.TaskPlanInstanceService
 import com.cleaningapp.backend.taskplan.TaskPlanRecurrenceCalculator
 import com.cleaningapp.backend.taskplan.TaskPlanRepository
@@ -31,6 +32,7 @@ import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.util.UUID
 
@@ -164,17 +166,30 @@ class TaskServiceImpl(
         val membership = getActiveMembershipForUpdate(user.id!!, household.id!!)
 
         val normalizedDueAt = dueAtNormalizer.normalize(task.dueAt)
-        if (task.recurrenceType != null && normalizedDueAt == null)
-            throw BusinessConflictException("Recurring task requires a due date")
+        val recurringSchedule = task.recurrenceType?.let { recurrenceType ->
+            if (normalizedDueAt != null) {
+                val schedule = recurrenceCalculator.createSchedule(normalizedDueAt, recurrenceType)
+                TaskPlanCreationSchedule(
+                    firstDueAt = normalizedDueAt,
+                    nextDueAt = schedule.nextDueAt,
+                    monthlyAnchorDay = schedule.monthlyAnchorDay,
+                    monthlyLastDay = schedule.monthlyLastDay,
+                )
+            } else {
+                recurrenceCalculator.createScheduleFromStartDate(
+                    startDate = LocalDate.now(clock),
+                    recurrenceType = recurrenceType,
+                )
+            }
+        }
 
-        val taskPlan = task.recurrenceType?.let { recurrenceType ->
-            val schedule = recurrenceCalculator.createSchedule(normalizedDueAt!!, recurrenceType)
+        val taskPlan = recurringSchedule?.let { schedule ->
             taskPlanRepository.saveAndFlush(
                 TaskPlanEntity(
                     title = task.title,
                     description = task.description,
                     reward = task.reward,
-                    recurrenceType = recurrenceType,
+                    recurrenceType = requireNotNull(task.recurrenceType),
                     nextDueAt = schedule.nextDueAt,
                     monthlyAnchorDay = schedule.monthlyAnchorDay,
                     monthlyLastDay = schedule.monthlyLastDay,
@@ -188,7 +203,10 @@ class TaskServiceImpl(
         val savedTask = if (taskPlan == null) {
             taskRepository.save(task.copy(dueAt = normalizedDueAt).toTaskEntity(user, household))
         } else {
-            taskPlanInstanceService.createTaskInstance(taskPlan.id!!, normalizedDueAt!!)
+            taskPlanInstanceService.createTaskInstance(
+                taskPlanId = taskPlan.id!!,
+                dueAt = requireNotNull(recurringSchedule).firstDueAt,
+            )
         }
 
         // запись TASK_CREATED в ленту активности

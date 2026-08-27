@@ -103,28 +103,98 @@ class TaskPlanIntegrationTest : BaseIntegrationTest() {
         assertThat(activities.single().activityType).isEqualTo(ActivityType.TASK_CREATED)
     }
 
-    @ParameterizedTest
-    @EnumSource(RecurrenceType::class)
-    fun `create recurring task should require due date`(recurrenceType: RecurrenceType) {
+    @Test
+    fun `create daily recurring task without due date should start cycle tomorrow`() {
+        val fixture = createRecurringWithoutDueAt(
+            startDate = LocalDate.of(2026, 8, 1),
+            recurrenceType = RecurrenceType.DAILY,
+        )
+
+        assertThat(fixture.task.dueAt).isEqualTo(endOfDay(LocalDate.of(2026, 8, 2)))
+        assertThat(fixture.plan.nextDueAt).isEqualTo(endOfDay(LocalDate.of(2026, 8, 3)))
+        assertThat(fixture.plan.monthlyAnchorDay).isNull()
+        assertThat(fixture.plan.monthlyLastDay).isFalse()
+        assertThat(activityRepository.findAll().map { it.activityType })
+            .containsExactly(ActivityType.TASK_CREATED)
+    }
+
+    @Test
+    fun `create weekly recurring task without due date should start cycle in seven days`() {
+        val fixture = createRecurringWithoutDueAt(
+            startDate = LocalDate.of(2026, 8, 1),
+            recurrenceType = RecurrenceType.WEEKLY,
+        )
+
+        assertThat(fixture.task.dueAt).isEqualTo(endOfDay(LocalDate.of(2026, 8, 8)))
+        assertThat(fixture.plan.nextDueAt).isEqualTo(endOfDay(LocalDate.of(2026, 8, 15)))
+        assertThat(fixture.plan.monthlyAnchorDay).isNull()
+        assertThat(fixture.plan.monthlyLastDay).isFalse()
+    }
+
+    @Test
+    fun `create monthly recurring task without due date should anchor to normal start day`() {
+        val fixture = createRecurringWithoutDueAt(
+            startDate = LocalDate.of(2026, 8, 10),
+            recurrenceType = RecurrenceType.MONTHLY,
+        )
+
+        assertThat(fixture.task.dueAt).isEqualTo(endOfDay(LocalDate.of(2026, 9, 10)))
+        assertThat(fixture.plan.nextDueAt).isEqualTo(endOfDay(LocalDate.of(2026, 10, 10)))
+        assertThat(fixture.plan.monthlyAnchorDay).isEqualTo(10)
+        assertThat(fixture.plan.monthlyLastDay).isFalse()
+    }
+
+    @Test
+    fun `create monthly recurring task without due date should preserve January 30 anchor`() {
+        val fixture = createRecurringWithoutDueAt(
+            startDate = LocalDate.of(2027, 1, 30),
+            recurrenceType = RecurrenceType.MONTHLY,
+        )
+
+        assertThat(fixture.task.dueAt).isEqualTo(endOfDay(LocalDate.of(2027, 2, 28)))
+        assertThat(fixture.plan.nextDueAt).isEqualTo(endOfDay(LocalDate.of(2027, 3, 30)))
+        assertThat(fixture.plan.monthlyAnchorDay).isEqualTo(30)
+        assertThat(fixture.plan.monthlyLastDay).isFalse()
+    }
+
+    @Test
+    fun `create monthly recurring task without due date should use last day anchor from January 31`() {
+        val fixture = createRecurringWithoutDueAt(
+            startDate = LocalDate.of(2027, 1, 31),
+            recurrenceType = RecurrenceType.MONTHLY,
+        )
+
+        assertThat(fixture.task.dueAt).isEqualTo(endOfDay(LocalDate.of(2027, 2, 28)))
+        assertThat(fixture.plan.nextDueAt).isEqualTo(endOfDay(LocalDate.of(2027, 3, 31)))
+        assertThat(fixture.plan.monthlyAnchorDay).isNull()
+        assertThat(fixture.plan.monthlyLastDay).isTrue()
+    }
+
+    @Test
+    fun `explicit recurring due date should remain first deadline and recurrence anchor`() {
+        testClock.setCurrentDateTime(LocalDateTime.of(2026, 8, 1, 12, 0))
         val user = createLocalUserForValidToken()
         val household = testDataFactory.createTestHousehold(createdBy = user)
         testDataFactory.createTestMembership(user = user, household = household)
         authenticateAs()
 
-        assertThatThrownBy {
-            taskService.createTask(
-                household.id!!,
-                TaskCreateDTO(
-                    title = "Recurring cleaning",
-                    reward = 30,
-                    recurrenceType = recurrenceType,
-                ),
-            )
-        }.isInstanceOf(BusinessConflictException::class.java)
+        val result = taskService.createTask(
+            household.id!!,
+            TaskCreateDTO(
+                title = "Explicit weekly task",
+                reward = 30,
+                dueAt = LocalDate.of(2026, 8, 5).atStartOfDay(),
+                recurrenceType = RecurrenceType.WEEKLY,
+            ),
+        )
 
-        assertThat(taskPlanRepository.findAll()).isEmpty()
-        assertThat(taskRepository.findAll()).isEmpty()
-        assertThat(activityRepository.findAll()).isEmpty()
+        entityManager.flush()
+        entityManager.clear()
+        val savedTask = taskRepository.findById(result.id).orElseThrow()
+        val savedPlan = taskPlanRepository.findById(result.taskPlanId!!).orElseThrow()
+
+        assertThat(savedTask.dueAt).isEqualTo(endOfDay(LocalDate.of(2026, 8, 5)))
+        assertThat(savedPlan.nextDueAt).isEqualTo(endOfDay(LocalDate.of(2026, 8, 12)))
     }
 
     @Test
@@ -279,4 +349,41 @@ class TaskPlanIntegrationTest : BaseIntegrationTest() {
             .isInstanceOf(BusinessConflictException::class.java)
             .hasMessage("Recurring task due date cannot be changed")
     }
+
+    private fun createRecurringWithoutDueAt(
+        startDate: LocalDate,
+        recurrenceType: RecurrenceType,
+    ): RecurringCreationFixture {
+        testClock.setCurrentDateTime(startDate.atTime(12, 0))
+        val user = createLocalUserForValidToken()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+        testDataFactory.createTestMembership(user = user, household = household)
+        authenticateAs()
+
+        val result = taskService.createTask(
+            household.id!!,
+            TaskCreateDTO(
+                title = "Recurring without explicit deadline",
+                description = "Created from clock date",
+                reward = 30,
+                recurrenceType = recurrenceType,
+            ),
+        )
+
+        entityManager.flush()
+        entityManager.clear()
+
+        return RecurringCreationFixture(
+            task = taskRepository.findById(result.id).orElseThrow(),
+            plan = taskPlanRepository.findById(result.taskPlanId!!).orElseThrow(),
+        )
+    }
+
+    private fun endOfDay(date: LocalDate): LocalDateTime =
+        TaskDueDatePolicy.endOfDay(date)
+
+    private data class RecurringCreationFixture(
+        val task: com.cleaningapp.backend.task.TaskEntity,
+        val plan: TaskPlanEntity,
+    )
 }

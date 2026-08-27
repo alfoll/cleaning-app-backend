@@ -10,6 +10,110 @@ class TaskPlanRecurrenceCalculatorTest {
     private val calculator = TaskPlanRecurrenceCalculator()
 
     @Test
+    fun `daily schedule from start date should create first and next deadlines`() {
+        val schedule = calculator.createScheduleFromStartDate(
+            startDate = LocalDate.of(2026, 8, 1),
+            recurrenceType = RecurrenceType.DAILY,
+        )
+
+        assertThat(schedule.firstDueAt).isEqualTo(endOfDay(LocalDate.of(2026, 8, 2)))
+        assertThat(schedule.nextDueAt).isEqualTo(endOfDay(LocalDate.of(2026, 8, 3)))
+        assertThat(schedule.monthlyAnchorDay).isNull()
+        assertThat(schedule.monthlyLastDay).isFalse()
+    }
+
+    @Test
+    fun `weekly schedule from start date should create first and next deadlines`() {
+        val schedule = calculator.createScheduleFromStartDate(
+            startDate = LocalDate.of(2026, 8, 1),
+            recurrenceType = RecurrenceType.WEEKLY,
+        )
+
+        assertThat(schedule.firstDueAt).isEqualTo(endOfDay(LocalDate.of(2026, 8, 8)))
+        assertThat(schedule.nextDueAt).isEqualTo(endOfDay(LocalDate.of(2026, 8, 15)))
+        assertThat(schedule.monthlyAnchorDay).isNull()
+        assertThat(schedule.monthlyLastDay).isFalse()
+    }
+
+    @Test
+    fun `monthly schedule from normal start date should preserve start day anchor`() {
+        val schedule = calculator.createScheduleFromStartDate(
+            startDate = LocalDate.of(2026, 8, 10),
+            recurrenceType = RecurrenceType.MONTHLY,
+        )
+
+        assertThat(schedule.firstDueAt).isEqualTo(endOfDay(LocalDate.of(2026, 9, 10)))
+        assertThat(schedule.nextDueAt).isEqualTo(endOfDay(LocalDate.of(2026, 10, 10)))
+        assertThat(schedule.monthlyAnchorDay).isEqualTo(10)
+        assertThat(schedule.monthlyLastDay).isFalse()
+    }
+
+    @Test
+    fun `monthly schedule from January 30 should recover anchor after non leap February`() {
+        val schedule = calculator.createScheduleFromStartDate(
+            startDate = LocalDate.of(2027, 1, 30),
+            recurrenceType = RecurrenceType.MONTHLY,
+        )
+
+        assertThat(schedule.firstDueAt).isEqualTo(endOfDay(LocalDate.of(2027, 2, 28)))
+        assertThat(schedule.nextDueAt).isEqualTo(endOfDay(LocalDate.of(2027, 3, 30)))
+        assertThat(schedule.monthlyAnchorDay).isEqualTo(30)
+        assertThat(schedule.monthlyLastDay).isFalse()
+    }
+
+    @Test
+    fun `monthly schedule from January 30 should recover anchor after leap February`() {
+        val schedule = calculator.createScheduleFromStartDate(
+            startDate = LocalDate.of(2028, 1, 30),
+            recurrenceType = RecurrenceType.MONTHLY,
+        )
+
+        assertThat(schedule.firstDueAt).isEqualTo(endOfDay(LocalDate.of(2028, 2, 29)))
+        assertThat(schedule.nextDueAt).isEqualTo(endOfDay(LocalDate.of(2028, 3, 30)))
+        assertThat(schedule.monthlyAnchorDay).isEqualTo(30)
+        assertThat(schedule.monthlyLastDay).isFalse()
+    }
+
+    @Test
+    fun `monthly schedule from January last day should keep last day semantics`() {
+        val schedule = calculator.createScheduleFromStartDate(
+            startDate = LocalDate.of(2027, 1, 31),
+            recurrenceType = RecurrenceType.MONTHLY,
+        )
+
+        assertThat(schedule.firstDueAt).isEqualTo(endOfDay(LocalDate.of(2027, 2, 28)))
+        assertThat(schedule.nextDueAt).isEqualTo(endOfDay(LocalDate.of(2027, 3, 31)))
+        assertThat(schedule.monthlyAnchorDay).isNull()
+        assertThat(schedule.monthlyLastDay).isTrue()
+    }
+
+    @Test
+    fun `monthly schedule from non leap February last day should keep last day semantics`() {
+        val schedule = calculator.createScheduleFromStartDate(
+            startDate = LocalDate.of(2027, 2, 28),
+            recurrenceType = RecurrenceType.MONTHLY,
+        )
+
+        assertThat(schedule.firstDueAt).isEqualTo(endOfDay(LocalDate.of(2027, 3, 31)))
+        assertThat(schedule.nextDueAt).isEqualTo(endOfDay(LocalDate.of(2027, 4, 30)))
+        assertThat(schedule.monthlyAnchorDay).isNull()
+        assertThat(schedule.monthlyLastDay).isTrue()
+    }
+
+    @Test
+    fun `monthly schedule from leap day should keep last day semantics`() {
+        val schedule = calculator.createScheduleFromStartDate(
+            startDate = LocalDate.of(2028, 2, 29),
+            recurrenceType = RecurrenceType.MONTHLY,
+        )
+
+        assertThat(schedule.firstDueAt).isEqualTo(endOfDay(LocalDate.of(2028, 3, 31)))
+        assertThat(schedule.nextDueAt).isEqualTo(endOfDay(LocalDate.of(2028, 4, 30)))
+        assertThat(schedule.monthlyAnchorDay).isNull()
+        assertThat(schedule.monthlyLastDay).isTrue()
+    }
+
+    @Test
     fun `daily should calculate next calendar day at end of day`() {
         val currentDueAt = endOfDay(LocalDate.of(2026, 9, 10))
 

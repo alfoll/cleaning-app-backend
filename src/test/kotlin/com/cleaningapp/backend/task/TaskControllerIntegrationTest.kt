@@ -3,6 +3,8 @@ package com.cleaningapp.backend.task
 import com.cleaningapp.backend.activity.ActivityRepository
 import com.cleaningapp.backend.activity.ActivityType
 import com.cleaningapp.backend.base.BaseIntegrationTest
+import com.cleaningapp.backend.taskplan.RecurrenceType
+import com.cleaningapp.backend.taskplan.TaskPlanRepository
 import com.cleaningapp.backend.transaction.TransactionRepository
 import com.cleaningapp.backend.transaction.TransactionType
 import com.cleaningapp.backend.userhousehold.UserHouseholdRepository
@@ -34,6 +36,9 @@ class TaskControllerIntegrationTest : BaseIntegrationTest() {
 
     @Autowired
     private lateinit var taskRepository: TaskRepository
+
+    @Autowired
+    private lateinit var taskPlanRepository: TaskPlanRepository
 
     @Autowired
     private lateinit var userHouseholdRepository: UserHouseholdRepository
@@ -148,6 +153,36 @@ class TaskControllerIntegrationTest : BaseIntegrationTest() {
         )
             .andExpect(status().isCreated)
             .andExpect(jsonPath("$.dueAt").value("${dueDate}T23:59:59.999999"))
+    }
+
+    @Test
+    fun `create recurring task should accept omitted due date`() {
+        val user = createLocalUserForValidToken()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+        testDataFactory.createTestMembership(user = user, household = household)
+        val startDate = LocalDate.now(clock)
+
+        mockMvc.perform(
+            post("/api/households/${household.id}/tasks")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $validToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "title": "Weekly recurring task",
+                      "reward": 20,
+                      "recurrenceType": "WEEKLY"
+                    }
+                    """.trimIndent()
+                )
+        )
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("$.dueAt").value("${startDate.plusDays(7)}T23:59:59.999999"))
+            .andExpect(jsonPath("$.recurrenceType").value(RecurrenceType.WEEKLY.name))
+            .andExpect(jsonPath("$.recurrenceActive").value(true))
+
+        val plan = taskPlanRepository.findAll().single()
+        assertThat(plan.nextDueAt).isEqualTo(endOfDay(startDate.plusDays(14)))
     }
 
     @Test

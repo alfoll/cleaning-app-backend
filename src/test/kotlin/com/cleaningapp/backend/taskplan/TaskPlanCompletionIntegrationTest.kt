@@ -4,6 +4,7 @@ import com.cleaningapp.backend.activity.ActivityRepository
 import com.cleaningapp.backend.activity.ActivityType
 import com.cleaningapp.backend.base.BaseIntegrationTest
 import com.cleaningapp.backend.config.MutableTestClock
+import com.cleaningapp.backend.task.TaskCreateDTO
 import com.cleaningapp.backend.task.TaskDueDatePolicy
 import com.cleaningapp.backend.task.TaskRepository
 import com.cleaningapp.backend.task.TaskService
@@ -138,6 +139,30 @@ class TaskPlanCompletionIntegrationTest : BaseIntegrationTest() {
 
         val plan = reloadPlan(fixture.planId)
         assertThat(plan.nextDueAt).isEqualTo(endOfDay(2026, 9, 27))
+    }
+
+    @Test
+    fun `early completion of weekly task created without due date should keep next cycle`() {
+        val fixture = recurringTaskCreatedWithoutDueAt(
+            completionTime = LocalDateTime.of(2026, 8, 5, 12, 0),
+        )
+
+        taskService.completeTask(fixture.taskId)
+
+        val plan = reloadPlan(fixture.planId)
+        assertThat(plan.nextDueAt).isEqualTo(endOfDay(2026, 8, 15))
+    }
+
+    @Test
+    fun `overdue completion of weekly task created without due date should restart from completion`() {
+        val fixture = recurringTaskCreatedWithoutDueAt(
+            completionTime = LocalDateTime.of(2026, 8, 10, 12, 0),
+        )
+
+        taskService.completeTask(fixture.taskId)
+
+        val plan = reloadPlan(fixture.planId)
+        assertThat(plan.nextDueAt).isEqualTo(endOfDay(2026, 8, 17))
     }
 
     @Test
@@ -292,6 +317,33 @@ class TaskPlanCompletionIntegrationTest : BaseIntegrationTest() {
         return CompletionFixture(
             taskId = task.id!!,
             planId = plan.id!!,
+            membershipId = membership.id!!,
+        )
+    }
+
+    private fun recurringTaskCreatedWithoutDueAt(
+        completionTime: LocalDateTime,
+    ): CompletionFixture {
+        testClock.setCurrentDateTime(LocalDateTime.of(2026, 8, 1, 12, 0))
+        val user = createLocalUserForValidToken()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+        val membership = testDataFactory.createTestMembership(user = user, household = household)
+        authenticateAs()
+
+        val createdTask = taskService.createTask(
+            householdId = household.id!!,
+            task = TaskCreateDTO(
+                title = "Weekly task without explicit deadline",
+                reward = 20,
+                recurrenceType = RecurrenceType.WEEKLY,
+            ),
+        )
+        taskService.assignTask(createdTask.id)
+        testClock.setCurrentDateTime(completionTime)
+
+        return CompletionFixture(
+            taskId = createdTask.id,
+            planId = createdTask.taskPlanId!!,
             membershipId = membership.id!!,
         )
     }
