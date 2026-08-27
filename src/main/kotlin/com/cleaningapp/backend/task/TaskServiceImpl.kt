@@ -235,19 +235,40 @@ class TaskServiceImpl(
         if (task.createdBy.id != user.id)
             throw BusinessConflictException("Only creator can update task")
 
-        val normalizedDueAt = dueAtNormalizer.normalize(newTask.dueAt)
-        if (task.taskPlan != null && normalizedDueAt != null && normalizedDueAt != task.dueAt)
-            throw BusinessConflictException("Recurring task due date cannot be changed")
+        val updatedDueAt = resolveUpdatedDueAt(task, newTask.dueAt)
 
         // Изменения экземпляра повторяющейся задачи не изменяют параметры плана.
         task.title = newTask.title
         task.description = newTask.description
         task.reward = newTask.reward
         if (task.taskPlan == null)
-            task.dueAt = normalizedDueAt
+            task.dueAt = updatedDueAt
 
 //        return taskRepository.save(task).toDto() // managed entity
         return task.toDto(LocalDateTime.now(clock))
+    }
+
+    private fun resolveUpdatedDueAt(
+        task: TaskEntity,
+        requestedDueAt: LocalDateTime?,
+    ): LocalDateTime? {
+        val existingDueAt = task.dueAt
+        val isSameCalendarDate = requestedDueAt != null &&
+            requestedDueAt.toLocalDate() == existingDueAt?.toLocalDate()
+
+        if (task.taskPlan != null) {
+            if (requestedDueAt == null || isSameCalendarDate)
+                return existingDueAt
+
+            throw BusinessConflictException("Recurring task due date cannot be changed")
+        }
+
+        if (requestedDueAt == null)
+            return null
+        if (isSameCalendarDate)
+            return existingDueAt
+
+        return dueAtNormalizer.normalize(requestedDueAt)
     }
 
     // массовая сущность - если свободна то можно жестко удалить

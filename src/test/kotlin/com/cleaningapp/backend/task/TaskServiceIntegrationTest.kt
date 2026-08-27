@@ -3,6 +3,7 @@ package com.cleaningapp.backend.task
 import com.cleaningapp.backend.activity.ActivityRepository
 import com.cleaningapp.backend.activity.ActivityType
 import com.cleaningapp.backend.base.BaseIntegrationTest
+import com.cleaningapp.backend.config.MutableTestClock
 import com.cleaningapp.backend.exception.BusinessConflictException
 import com.cleaningapp.backend.exception.HouseholdNotActiveException
 import com.cleaningapp.backend.exception.MembershipNotActiveException
@@ -15,6 +16,7 @@ import jakarta.persistence.EntityManager
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.AfterEach
 import org.springframework.beans.factory.annotation.Autowired
 import java.util.UUID
 import org.junit.jupiter.params.ParameterizedTest
@@ -47,6 +49,14 @@ class TaskServiceIntegrationTest : BaseIntegrationTest() {
 
     @Autowired
     private lateinit var clock: Clock
+
+    @Autowired
+    private lateinit var testClock: MutableTestClock
+
+    @AfterEach
+    fun resetClock() {
+        testClock.reset()
+    }
 
     enum class TaskOperation {
         UPDATE,
@@ -400,6 +410,152 @@ class TaskServiceIntegrationTest : BaseIntegrationTest() {
         assertThat(result.dueAt).isEqualTo(endOfDay(newDueDate))
         assertThat(taskRepository.findById(task.id!!).orElseThrow().dueAt)
             .isEqualTo(endOfDay(newDueDate))
+    }
+
+    @Test
+    fun `updateTask should preserve overdue due date when incoming calendar date is unchanged`() {
+        testClock.setCurrentDateTime(LocalDateTime.of(2026, 8, 27, 12, 0))
+        val user = createLocalUserForValidToken()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+        testDataFactory.createTestMembership(user = user, household = household)
+        val existingDueAt = endOfDay(LocalDate.of(2026, 8, 10))
+        val task = testDataFactory.createTestFreeTask(
+            household = household,
+            createdBy = user,
+            dueAt = existingDueAt,
+        )
+        authenticateAs()
+
+        val result = taskService.updateTask(
+            task.id!!,
+            TaskUpdateDTO(
+                title = "Updated overdue task",
+                description = "Updated description",
+                reward = 45,
+                dueAt = LocalDate.of(2026, 8, 10).atStartOfDay(),
+            ),
+        )
+
+        entityManager.flush()
+        entityManager.clear()
+        val savedTask = taskRepository.findById(task.id!!).orElseThrow()
+        assertThat(result.title).isEqualTo("Updated overdue task")
+        assertThat(result.description).isEqualTo("Updated description")
+        assertThat(result.reward).isEqualTo(45)
+        assertThat(result.dueAt).isEqualTo(existingDueAt)
+        assertThat(result.isOverdue).isTrue()
+        assertThat(savedTask.dueAt).isEqualTo(existingDueAt)
+    }
+
+    @Test
+    fun `updateTask should allow changing only title while overdue deadline date is echoed back`() {
+        testClock.setCurrentDateTime(LocalDateTime.of(2026, 8, 27, 12, 0))
+        val user = createLocalUserForValidToken()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+        testDataFactory.createTestMembership(user = user, household = household)
+        val existingDueAt = endOfDay(LocalDate.of(2026, 8, 10))
+        val task = testDataFactory.createTestFreeTask(
+            household = household,
+            createdBy = user,
+            dueAt = existingDueAt,
+        )
+        authenticateAs()
+
+        val result = taskService.updateTask(
+            task.id!!,
+            TaskUpdateDTO(
+                title = "Only title changed",
+                description = task.description,
+                reward = task.reward,
+                dueAt = LocalDate.of(2026, 8, 10).atTime(7, 15),
+            ),
+        )
+
+        assertThat(result.title).isEqualTo("Only title changed")
+        assertThat(result.dueAt).isEqualTo(existingDueAt)
+        assertThat(result.isOverdue).isTrue()
+    }
+
+    @Test
+    fun `updateTask should reject a different past due date`() {
+        testClock.setCurrentDateTime(LocalDateTime.of(2026, 8, 27, 12, 0))
+        val user = createLocalUserForValidToken()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+        testDataFactory.createTestMembership(user = user, household = household)
+        val task = testDataFactory.createTestFreeTask(
+            household = household,
+            createdBy = user,
+            dueAt = endOfDay(LocalDate.of(2026, 9, 10)),
+        )
+        authenticateAs()
+
+        assertThatThrownBy {
+            taskService.updateTask(
+                task.id!!,
+                TaskUpdateDTO(
+                    title = task.title,
+                    description = task.description,
+                    reward = task.reward,
+                    dueAt = LocalDate.of(2026, 8, 20).atStartOfDay(),
+                ),
+            )
+        }
+            .isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessage("Task due date cannot be in the past")
+    }
+
+    @Test
+    fun `updateTask should allow a new due date today and normalize it`() {
+        testClock.setCurrentDateTime(LocalDateTime.of(2026, 8, 27, 12, 0))
+        val user = createLocalUserForValidToken()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+        testDataFactory.createTestMembership(user = user, household = household)
+        val task = testDataFactory.createTestFreeTask(
+            household = household,
+            createdBy = user,
+            dueAt = endOfDay(LocalDate.of(2026, 9, 10)),
+        )
+        authenticateAs()
+
+        val result = taskService.updateTask(
+            task.id!!,
+            TaskUpdateDTO(
+                title = task.title,
+                description = task.description,
+                reward = task.reward,
+                dueAt = LocalDate.of(2026, 8, 27).atTime(8, 30),
+            ),
+        )
+
+        assertThat(result.dueAt).isEqualTo(endOfDay(LocalDate.of(2026, 8, 27)))
+    }
+
+    @Test
+    fun `updateTask should preserve existing value for same future calendar date`() {
+        testClock.setCurrentDateTime(LocalDateTime.of(2026, 8, 27, 12, 0))
+        val user = createLocalUserForValidToken()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+        testDataFactory.createTestMembership(user = user, household = household)
+        val existingDueAt = endOfDay(LocalDate.of(2026, 9, 10))
+        val task = testDataFactory.createTestFreeTask(
+            household = household,
+            createdBy = user,
+            dueAt = existingDueAt,
+        )
+        authenticateAs()
+
+        val result = taskService.updateTask(
+            task.id!!,
+            TaskUpdateDTO(
+                title = task.title,
+                description = task.description,
+                reward = task.reward,
+                dueAt = LocalDate.of(2026, 9, 10).atStartOfDay(),
+            ),
+        )
+
+        assertThat(result.dueAt).isEqualTo(existingDueAt)
+        assertThat(task.dueAt).isEqualTo(existingDueAt)
     }
 
     @Test

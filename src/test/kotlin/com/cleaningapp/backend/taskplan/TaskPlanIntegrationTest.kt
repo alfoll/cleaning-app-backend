@@ -3,6 +3,7 @@ package com.cleaningapp.backend.taskplan
 import com.cleaningapp.backend.activity.ActivityRepository
 import com.cleaningapp.backend.activity.ActivityType
 import com.cleaningapp.backend.base.BaseIntegrationTest
+import com.cleaningapp.backend.config.MutableTestClock
 import com.cleaningapp.backend.exception.BusinessConflictException
 import com.cleaningapp.backend.task.TaskCreateDTO
 import com.cleaningapp.backend.task.TaskDueDatePolicy
@@ -13,11 +14,13 @@ import jakarta.persistence.EntityManager
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.EnumSource
 import org.springframework.beans.factory.annotation.Autowired
 import java.time.Clock
 import java.time.LocalDate
+import java.time.LocalDateTime
 
 class TaskPlanIntegrationTest : BaseIntegrationTest() {
 
@@ -41,6 +44,14 @@ class TaskPlanIntegrationTest : BaseIntegrationTest() {
 
     @Autowired
     private lateinit var clock: Clock
+
+    @Autowired
+    private lateinit var testClock: MutableTestClock
+
+    @AfterEach
+    fun resetClock() {
+        testClock.reset()
+    }
 
     @ParameterizedTest
     @EnumSource(RecurrenceType::class)
@@ -183,11 +194,12 @@ class TaskPlanIntegrationTest : BaseIntegrationTest() {
     }
 
     @Test
-    fun `update recurring task should allow same due date after normalization`() {
+    fun `update recurring task should allow same overdue calendar date without normalization`() {
+        testClock.setCurrentDateTime(LocalDateTime.of(2026, 8, 27, 12, 0))
         val user = createLocalUserForValidToken()
         val household = testDataFactory.createTestHousehold(createdBy = user)
         testDataFactory.createTestMembership(user = user, household = household)
-        val dueDate = LocalDate.now(clock).plusDays(3)
+        val dueDate = LocalDate.of(2026, 8, 10)
         val taskPlan = testDataFactory.createTestTaskPlan(household = household, createdBy = user)
         val task = testDataFactory.createTestFreeTask(
             household = household,
@@ -207,6 +219,7 @@ class TaskPlanIntegrationTest : BaseIntegrationTest() {
         )
 
         assertThat(result.dueAt).isEqualTo(TaskDueDatePolicy.endOfDay(dueDate))
+        assertThat(result.isOverdue).isTrue()
     }
 
     @Test
@@ -233,6 +246,37 @@ class TaskPlanIntegrationTest : BaseIntegrationTest() {
                     dueAt = dueDate.plusDays(1).atStartOfDay(),
                 ),
             )
-        }.isInstanceOf(BusinessConflictException::class.java)
+        }
+            .isInstanceOf(BusinessConflictException::class.java)
+            .hasMessage("Recurring task due date cannot be changed")
+    }
+
+    @Test
+    fun `update recurring task should reject different past date as recurring change`() {
+        testClock.setCurrentDateTime(LocalDateTime.of(2026, 8, 27, 12, 0))
+        val user = createLocalUserForValidToken()
+        val household = testDataFactory.createTestHousehold(createdBy = user)
+        testDataFactory.createTestMembership(user = user, household = household)
+        val taskPlan = testDataFactory.createTestTaskPlan(household = household, createdBy = user)
+        val task = testDataFactory.createTestFreeTask(
+            household = household,
+            createdBy = user,
+            dueAt = TaskDueDatePolicy.endOfDay(LocalDate.of(2026, 9, 10)),
+            taskPlan = taskPlan,
+        )
+        authenticateAs()
+
+        assertThatThrownBy {
+            taskService.updateTask(
+                task.id!!,
+                TaskUpdateDTO(
+                    title = "Changed instance",
+                    reward = 25,
+                    dueAt = LocalDate.of(2026, 8, 20).atStartOfDay(),
+                ),
+            )
+        }
+            .isInstanceOf(BusinessConflictException::class.java)
+            .hasMessage("Recurring task due date cannot be changed")
     }
 }
